@@ -174,6 +174,10 @@ struct k3_nav_ring {
 	int		proxy_id;
 };
 
+struct k3_nav_ringacc_ops {
+	int (*init)(struct udevice *dev, struct k3_nav_ringacc *ringacc);
+};
+
 /**
  * struct k3_nav_ringacc - Rings accelerator descriptor
  *
@@ -189,6 +193,7 @@ struct k3_nav_ring {
  * @tisci - pointer ti-sci handle
  * @tisci_ring_ops - ti-sci rings ops
  * @tisci_dev_id - ti-sci device id
+ * @ops: SoC specific ringacc operation
  */
 struct k3_nav_ringacc {
 	struct udevice *dev;
@@ -207,6 +212,8 @@ struct k3_nav_ringacc {
 	const struct ti_sci_handle *tisci;
 	const struct ti_sci_rm_ringacc_ops *tisci_ring_ops;
 	u32  tisci_dev_id;
+
+	const struct k3_nav_ringacc_ops *ops;
 };
 
 static long k3_nav_ringacc_ring_get_fifo_pos(struct k3_nav_ring *ring)
@@ -1002,17 +1009,10 @@ static int k3_nav_ringacc_probe_dt(struct k3_nav_ringacc *ringacc)
 	return 0;
 }
 
-static int k3_nav_ringacc_probe(struct udevice *dev)
+static int k3_nav_ringacc_init(struct udevice *dev, struct k3_nav_ringacc *ringacc)
 {
-	struct k3_nav_ringacc *ringacc;
 	void __iomem *base_fifo, *base_rt;
 	int ret, i;
-
-	ringacc = dev_get_priv(dev);
-	if (!ringacc)
-		return -ENOMEM;
-
-	ringacc->dev = dev;
 
 	ret = k3_nav_ringacc_probe_dt(ringacc);
 	if (ret)
@@ -1083,10 +1083,41 @@ static int k3_nav_ringacc_probe(struct udevice *dev)
 	return 0;
 }
 
+struct ringacc_match_data {
+	struct k3_nav_ringacc_ops ops;
+};
+
+static struct ringacc_match_data k3_nav_ringacc_data = {
+	.ops = {
+		.init = k3_nav_ringacc_init,
+	},
+};
+
 static const struct udevice_id knav_ringacc_ids[] = {
-	{ .compatible = "ti,am654-navss-ringacc" },
+	{ .compatible = "ti,am654-navss-ringacc", .data = (ulong)&k3_nav_ringacc_data, },
 	{},
 };
+
+static int k3_nav_ringacc_probe(struct udevice *dev)
+{
+	struct k3_nav_ringacc *ringacc;
+	int ret;
+	const struct ringacc_match_data *match_data;
+
+	match_data = (struct ringacc_match_data *)dev_get_driver_data(dev);
+
+	ringacc = dev_get_priv(dev);
+	if (!ringacc)
+		return -ENOMEM;
+
+	ringacc->dev = dev;
+	ringacc->ops = &match_data->ops;
+	ret = ringacc->ops->init(dev, ringacc);
+	if (ret)
+		return ret;
+
+	return 0;
+}
 
 U_BOOT_DRIVER(k3_navss_ringacc) = {
 	.name	= "k3-navss-ringacc",
