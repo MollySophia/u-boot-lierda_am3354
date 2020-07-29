@@ -142,7 +142,10 @@ int ft_board_setup(void *blob, bd_t *bd)
 {
 	int ret;
 
-	ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000", "sram@70000000");
+	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
+	if (ret < 0)
+		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
+					 "sram@70000000");
 	if (ret) {
 		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
 		return ret;
@@ -150,7 +153,10 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 #if defined(CONFIG_TI_SECURE_DEVICE)
 	/* Make Crypto HW reserved for secure world use */
-	ret = fdt_disable_node(blob, "/interconnect@100000/crypto@4E00000");
+	ret = fdt_disable_node(blob, "/bus@100000/crypto@4e00000");
+	if (ret < 0)
+		ret = fdt_disable_node(blob,
+				       "/interconnect@100000/crypto@4E00000");
 	if (ret)
 		printf("%s: disabling SA2UL failed %d\n", __func__, ret);
 #endif
