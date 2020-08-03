@@ -148,6 +148,8 @@
 #define CONFIG_SYS_MMC_ENV_PART	1
 #endif
 
+#define CONFIG_SYS_USB_FAT_BOOT_PARTITION 1
+
 /* Now for the remaining common defines */
 #include <configs/ti_armv7_common.h>
 
