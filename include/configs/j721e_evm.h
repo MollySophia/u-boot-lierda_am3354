@@ -80,16 +80,23 @@
 		"${mtdparts}\0"						\
 	"run_kern=booti ${loadaddr} ${rd_spec} ${fdtaddr}\0"
 
+#ifdef CONFIG_SYS_K3_SPL_ATF
+#define EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC				\
+	"mainr5f0_0loadaddr=0x88000000\0"				\
+	"mainr5f0_0fwname=/lib/firmware/j7-main-r5f0_0-fw\0"		\
+	"mcur5f0_0loadaddr=0x89000000\0"				\
+	"mcur5f0_0fwname=/lib/firmware/j7-mcu-r5f0_0-fw\0"
+#else
+#define EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC ""
+#endif /* CONFIG_SYS_K3_SPL_ATF */
+
 /* U-Boot MMC-specific configuration */
 #define EXTRA_ENV_J721E_BOARD_SETTINGS_MMC				\
 	"boot=mmc\0"							\
 	"mmcdev=1\0"							\
 	"bootpart=1:2\0"						\
 	"bootdir=/boot\0"						\
-	"mainr5f0_0loadaddr=88000000\0"					\
-	"mainr5f0_0fwname=/lib/firmware/j7-main-r5f0_0-fw\0"		\
-	"mcur5f0_0loadaddr=89000000\0"					\
-	"mcur5f0_0fwname=/lib/firmware/j7-mcu-r5f0_0-fw\0"		\
+	EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC				\
 	"rd_spec=-\0"							\
 	"init_mmc=run args_all args_mmc\0"				\
 	"get_fdt_mmc=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${name_fdt}\0" \
