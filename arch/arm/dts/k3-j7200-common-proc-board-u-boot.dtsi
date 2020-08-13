@@ -78,6 +78,10 @@
 	u-boot,dm-spl;
 };
 
+&main_gpio0 {
+	u-boot,dm-spl;
+};
+
 &main_sdhci0 {
 	u-boot,dm-spl;
 };
