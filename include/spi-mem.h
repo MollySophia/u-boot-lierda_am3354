@@ -91,7 +91,6 @@ struct spi_mem_op {
 	struct {
 		u8 buswidth;
 		u8 opcode;
-		bool dtr;
 	} cmd;
 
 	struct {

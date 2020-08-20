@@ -41,13 +41,6 @@ static int spi_nor_read_write_reg(struct spi_nor *nor, struct spi_mem_op
 		op->data.buf.in = buf;
 	else
 		op->data.buf.out = buf;
-
-	/* get transfer protocols. */
-	op->cmd.buswidth = spi_nor_get_protocol_inst_nbits(nor->reg_proto);
-	op->addr.buswidth = spi_nor_get_protocol_addr_nbits(nor->reg_proto);
-	op->data.buswidth = spi_nor_get_protocol_data_nbits(nor->reg_proto);
-	op->cmd.dtr = spi_nor_protocol_is_dtr(nor->reg_proto);
-
 	return spi_mem_exec_op(nor->spi, op);
 }
 
@@ -93,7 +86,6 @@ static ssize_t spi_nor_read_data(struct spi_nor *nor, loff_t from, size_t len,
 	op.addr.buswidth = spi_nor_get_protocol_addr_nbits(nor->read_proto);
 	op.dummy.buswidth = op.addr.buswidth;
 	op.data.buswidth = spi_nor_get_protocol_data_nbits(nor->read_proto);
-	op.cmd.dtr = spi_nor_protocol_is_dtr(nor->read_proto);
 
 	/* convert the dummy cycles to the number of bytes */
 	op.dummy.nbytes = (nor->read_dummy * op.dummy.buswidth) / 8;
@@ -130,7 +122,6 @@ static ssize_t spi_nor_write_data(struct spi_nor *nor, loff_t to, size_t len,
 	op.cmd.buswidth = spi_nor_get_protocol_inst_nbits(nor->write_proto);
 	op.addr.buswidth = spi_nor_get_protocol_addr_nbits(nor->write_proto);
 	op.data.buswidth = spi_nor_get_protocol_data_nbits(nor->write_proto);
-	op.cmd.dtr = spi_nor_protocol_is_dtr(nor->write_proto);
 
 	if (nor->program_opcode == SPINOR_OP_AAI_WP && nor->sst_write_second)
 		op.addr.nbytes = 0;
@@ -288,7 +279,6 @@ static u8 spi_nor_convert_3to4_read(u8 opcode)
 		{ SPINOR_OP_READ_1_1_1_DTR,	SPINOR_OP_READ_1_1_1_DTR_4B },
 		{ SPINOR_OP_READ_1_2_2_DTR,	SPINOR_OP_READ_1_2_2_DTR_4B },
 		{ SPINOR_OP_READ_1_4_4_DTR,	SPINOR_OP_READ_1_4_4_DTR_4B },
-		{ SPINOR_OP_READ_8_8_8_DTR,	SPINOR_OP_READ_8_8_8_DTR_4B },
 	};
 
 	return spi_nor_convert_opcode(opcode, spi_nor_3to4_read,
@@ -1509,7 +1499,6 @@ enum spi_nor_read_command_index {
 	SNOR_CMD_READ_1_8_8,
 	SNOR_CMD_READ_8_8_8,
 	SNOR_CMD_READ_1_8_8_DTR,
-	SNOR_CMD_READ_8_8_8_DTR,
 
 	SNOR_CMD_READ_MAX
 };
@@ -1594,8 +1583,6 @@ static int spi_nor_read_sfdp(struct spi_nor *nor, u32 addr,
 	nor->read_opcode = SPINOR_OP_RDSFDP;
 	nor->addr_width = 3;
 	nor->read_dummy = 8;
-
-	nor->read_proto = SNOR_PROTO_1_1_1;
 
 	while (len) {
 		ret = nor->read(nor, addr, len, (u8 *)buf);
@@ -2170,11 +2157,11 @@ static int spi_nor_init_params(struct spi_nor *nor,
 					  SNOR_PROTO_1_1_4);
 	}
 
-	if (info->flags & SPI_NOR_OPI_DTR) {
-		params->hwcaps.mask |= SNOR_HWCAPS_READ_8_8_8_DTR;
-		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_8_8_8_DTR],
-					  0, 16, SPINOR_OP_READ_8_8_8_DTR,
-					  SNOR_PROTO_8_8_8_DTR);
+	if (info->flags & SPI_NOR_OCTAL_READ) {
+		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
+		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_1_1_8],
+					  0, 8, SPINOR_OP_READ_1_1_8,
+					  SNOR_PROTO_1_1_8);
 	}
 
 	/* Page Program settings. */
@@ -2258,7 +2245,6 @@ static int spi_nor_hwcaps_read2cmd(u32 hwcaps)
 		{ SNOR_HWCAPS_READ_1_8_8,	SNOR_CMD_READ_1_8_8 },
 		{ SNOR_HWCAPS_READ_8_8_8,	SNOR_CMD_READ_8_8_8 },
 		{ SNOR_HWCAPS_READ_1_8_8_DTR,	SNOR_CMD_READ_1_8_8_DTR },
-		{ SNOR_HWCAPS_READ_8_8_8_DTR,	SNOR_CMD_READ_8_8_8_DTR },
 	};
 
 	return spi_nor_hwcaps2cmd(hwcaps, hwcaps_read2cmd,
@@ -2376,6 +2362,7 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
 	/* SPI n-n-n protocols are not supported yet. */
 	ignored_mask = (SNOR_HWCAPS_READ_2_2_2 |
 			SNOR_HWCAPS_READ_4_4_4 |
+			SNOR_HWCAPS_READ_8_8_8 |
 			SNOR_HWCAPS_PP_4_4_4 |
 			SNOR_HWCAPS_PP_8_8_8);
 	if (shared_mask & ignored_mask) {
