@@ -160,7 +160,7 @@
 
 /* set default dfu_bufsiz to 128KB (sector size of OSPI) */
 #define EXTRA_ENV_DFUARGS \
-	"dfu_bufsiz=0x20000\0" \
+	"dfu_bufsiz=0x40000\0" \
 	DFU_ALT_INFO_MMC \
 	DFU_ALT_INFO_EMMC \
 	DFU_ALT_INFO_RAM \
