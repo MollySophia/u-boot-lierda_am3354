@@ -520,7 +520,7 @@
 		reg = <0x0>;
 		spi-tx-bus-width = <8>;
 		spi-rx-bus-width = <8>;
-		spi-max-frequency = <50000000>;
+		spi-max-frequency = <25000000>;
 		cdns,tshsl-ns = <60>;
 		cdns,tsd2d-ns = <60>;
 		cdns,tchsh-ns = <60>;
@@ -529,6 +529,11 @@
 		cdns,phy-mode;
 		#address-cells = <1>;
 		#size-cells = <1>;
+		partition@3fe0000 {
+			u-boot,dm-spl;
+			label = "ospi.phypattern";
+			reg = <0x3fe0000 0x20000>;
+		};
 	};
 };
 
