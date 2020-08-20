@@ -93,6 +93,8 @@ enum spi_mem_data_dir {
  * @data.dir: direction of the transfer
  * @data.buf.in: input buffer
  * @data.buf.out: output buffer
+ * @max_freq: the maximum frequency this op can run at. A value of 0
+ *	      means there is no limit on the frequency.
  */
 struct spi_mem_op {
 	struct {
@@ -126,6 +128,8 @@ struct spi_mem_op {
 			const void *out;
 		} buf;
 	} data;
+
+	u32 max_freq;
 };
 
 #define SPI_MEM_OP(__cmd, __addr, __dummy, __data)		\
