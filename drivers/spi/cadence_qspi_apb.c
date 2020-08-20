@@ -567,12 +567,9 @@ disable_phy:
 }
 
 static int cadence_qspi_apb_exec_flash_cmd(void *reg_base,
-					   unsigned int reg, bool dtr_en)
+	unsigned int reg)
 {
 	unsigned int retry = CQSPI_REG_RETRY;
-
-	if (dtr_en)
-		cqspi_phy_dtr_enable(reg_base, true);
 
 	/* Write the CMDCTRL without start execution. */
 	writel(reg, reg_base + CQSPI_REG_CMDCTRL);
@@ -586,9 +583,6 @@ static int cadence_qspi_apb_exec_flash_cmd(void *reg_base,
 			break;
 		udelay(1);
 	}
-
-	if (dtr_en)
-		cqspi_phy_dtr_enable(reg_base, false);
 
 	if (!retry) {
 		printf("QSPI: flash command execution timeout\n");
@@ -623,7 +617,7 @@ int cadence_qspi_apb_command_read(void *reg_base, const struct spi_mem_op *op)
 	/* 0 means 1 byte. */
 	reg |= (((rxlen - 1) & CQSPI_REG_CMDCTRL_RD_BYTES_MASK)
 		<< CQSPI_REG_CMDCTRL_RD_BYTES_LSB);
-	status = cadence_qspi_apb_exec_flash_cmd(reg_base, reg, op->cmd.dtr);
+	status = cadence_qspi_apb_exec_flash_cmd(reg_base, reg);
 	if (status != 0)
 		return status;
 
@@ -690,7 +684,7 @@ int cadence_qspi_apb_command_write(void *reg_base, const struct spi_mem_op *op)
 	}
 
 	/* Execute the command */
-	return cadence_qspi_apb_exec_flash_cmd(reg_base, reg, op->cmd.dtr);
+	return cadence_qspi_apb_exec_flash_cmd(reg_base, reg);
 }
 
 /* Opcode + Address (3/4 bytes) + dummy bytes (0-4 bytes) */
@@ -716,23 +710,14 @@ int cadence_qspi_apb_read_setup(struct cadence_spi_platdata *plat,
 		/* Instruction and address at DQ0, data at DQ0-3. */
 		rd_reg |= CQSPI_INST_TYPE_QUAD << CQSPI_REG_RD_INSTR_TYPE_DATA_LSB;
 
-	if (op->addr.buswidth == 8)
-		rd_reg |= CQSPI_INST_TYPE_OCTAL <<
-			  CQSPI_REG_RD_INSTR_TYPE_ADDR_LSB;
-
-	if (op->cmd.buswidth == 8)
-		rd_reg |= CQSPI_INST_TYPE_OCTAL <<
-			  CQSPI_REG_RD_INSTR_TYPE_INSTR_LSB;
-
 	writel(op->addr.val, plat->regbase + CQSPI_REG_INDIRECTRDSTARTADDR);
-
-	/* Convert to clock cycles. */
-	dummy_clk = dummy_bytes * CQSPI_DUMMY_CLKS_PER_BYTE /
-		    op->dummy.buswidth;
 
 	if (dummy_bytes) {
 		if (dummy_bytes > CQSPI_DUMMY_BYTES_MAX)
 			dummy_bytes = CQSPI_DUMMY_BYTES_MAX;
+
+		/* Convert to clock cycles. */
+		dummy_clk = dummy_bytes * CQSPI_DUMMY_CLKS_PER_BYTE;
 
 		if (dummy_clk)
 			rd_reg |= (dummy_clk & CQSPI_REG_RD_INSTR_DUMMY_MASK)
@@ -744,8 +729,7 @@ int cadence_qspi_apb_read_setup(struct cadence_spi_platdata *plat,
 	/* set device size */
 	reg = readl(plat->regbase + CQSPI_REG_SIZE);
 	reg &= ~CQSPI_REG_SIZE_ADDRESS_MASK;
-	if (op->addr.nbytes)
-		reg |= (op->addr.nbytes - 1);
+	reg |= (op->addr.nbytes - 1);
 	writel(reg, plat->regbase + CQSPI_REG_SIZE);
 	return 0;
 }
@@ -843,19 +827,12 @@ int cadence_qspi_apb_read_execute(struct cadence_spi_platdata *plat,
 	size_t len = op->data.nbytes;
 
 	if (plat->use_dac_mode && (from + len < plat->ahbsize)) {
-		if (op->cmd.dtr) {
-			cqspi_phy_dtr_enable(plat->regbase, true);
-			len = roundup(len, 16);
-		}
-
-		if (dma_memcpy(buf, plat->ahbbase + from, len) < 0)
+		if (len < 256 ||
+		    dma_memcpy(buf, plat->ahbbase + from, len) < 0) {
 			memcpy_fromio(buf, plat->ahbbase + from, len);
-
-		cadence_qspi_wait_idle(plat->regbase);
-
-		if (op->cmd.dtr)
-			cqspi_phy_dtr_enable(plat->regbase, false);
-
+		}
+		if (!cadence_qspi_wait_idle(plat->regbase))
+			return -EIO;
 		return 0;
 	}
 
@@ -874,25 +851,13 @@ int cadence_qspi_apb_write_setup(struct cadence_spi_platdata *plat,
 
 	/* Configure the opcode */
 	reg = op->cmd.opcode << CQSPI_REG_WR_INSTR_OPCODE_LSB;
-	if (op->addr.buswidth == 8)
-		reg |= CQSPI_INST_TYPE_OCTAL << CQSPI_REG_RD_INSTR_TYPE_ADDR_LSB;
-	if (op->data.buswidth == 8)
-		reg |= CQSPI_INST_TYPE_OCTAL << CQSPI_REG_RD_INSTR_TYPE_DATA_LSB;
 	writel(reg, plat->regbase + CQSPI_REG_WR_INSTR);
-
-	reg = readl(plat->regbase + CQSPI_REG_RD_INSTR);
-	reg &= ~(CQSPI_REG_RD_INSTR_TYPE_INSTR_MASK <<
-		 CQSPI_REG_RD_INSTR_TYPE_INSTR_LSB);
-	if (op->cmd.buswidth == 8)
-		reg |= CQSPI_INST_TYPE_OCTAL << CQSPI_REG_RD_INSTR_TYPE_INSTR_LSB;
-	writel(reg, plat->regbase + CQSPI_REG_RD_INSTR);
 
 	writel(op->addr.val, plat->regbase + CQSPI_REG_INDIRECTWRSTARTADDR);
 
 	reg = readl(plat->regbase + CQSPI_REG_SIZE);
 	reg &= ~CQSPI_REG_SIZE_ADDRESS_MASK;
-	if (op->addr.nbytes)
-		reg |= (op->addr.nbytes - 1);
+	reg |= (op->addr.nbytes - 1);
 	writel(reg, plat->regbase + CQSPI_REG_SIZE);
 	return 0;
 }
@@ -979,15 +944,7 @@ int cadence_qspi_apb_write_execute(struct cadence_spi_platdata *plat,
 	size_t len = op->data.nbytes;
 
 	if (plat->use_dac_mode && (to + len < plat->ahbsize)) {
-		if (op->cmd.dtr)
-			cqspi_phy_dtr_enable(plat->regbase, true);
-
 		memcpy_toio(plat->ahbbase + to, buf, len);
-
-		if (op->cmd.dtr)
-			cqspi_phy_dtr_enable(plat->regbase, false);
-
-		/* Polling QSPI idle status. */
 		if (!cadence_qspi_wait_idle(plat->regbase))
 			return -EIO;
 		return 0;
