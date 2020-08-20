@@ -40,20 +40,22 @@ static int cadence_spi_write_speed(struct udevice *bus, uint hz)
 	return 0;
 }
 
-static int cadence_spi_read_id(void *reg_base, u8 len, u8 *idcode)
+static int cadence_spi_read_id(struct cadence_spi_platdata *plat, u8 len,
+			       u8 *idcode)
 {
 	struct spi_mem_op op = SPI_MEM_OP(SPI_MEM_OP_CMD(0x9F, 1),
 					  SPI_MEM_OP_NO_ADDR,
 					  SPI_MEM_OP_NO_DUMMY,
 					  SPI_MEM_OP_DATA_IN(len, idcode, 1));
 
-	return cadence_qspi_apb_command_read(reg_base, &op);
+	return cadence_qspi_apb_command_read(plat, &op);
 }
 
 /* Calibration sequence to determine the read data capture delay register */
 static int spi_calibration(struct udevice *bus, uint hz)
 {
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
+	struct cadence_spi_platdata *plat = bus->platdata;
 	void *base = priv->regbase;
 	unsigned int idcode = 0, temp = 0;
 	int err = 0, i, range_lo = -1, range_hi = -1;
@@ -68,7 +70,7 @@ static int spi_calibration(struct udevice *bus, uint hz)
 	cadence_qspi_apb_controller_enable(base);
 
 	/* read the ID which will be our golden value */
-	err = cadence_spi_read_id(base, 3, (u8 *)&idcode);
+	err = cadence_spi_read_id(plat, 3, (u8 *)&idcode);
 	if (err) {
 		puts("SF: Calibration failed (read)\n");
 		return err;
@@ -87,7 +89,7 @@ static int spi_calibration(struct udevice *bus, uint hz)
 		cadence_qspi_apb_controller_enable(base);
 
 		/* issue a RDID to get the ID value */
-		err = cadence_spi_read_id(base, 3, (u8 *)&temp);
+		err = cadence_spi_read_id(plat, 3, (u8 *)&temp);
 		if (err) {
 			puts("SF: Calibration failed (read)\n");
 			return err;
@@ -268,10 +270,14 @@ static int cadence_spi_mem_exec_op(struct spi_slave *spi,
 
 	switch (mode) {
 	case CQSPI_STIG_READ:
-		err = cadence_qspi_apb_command_read(base, op);
+		err = cadence_qspi_apb_command_read_setup(plat, op);
+		if (!err)
+			err = cadence_qspi_apb_command_read(plat, op);
 		break;
 	case CQSPI_STIG_WRITE:
-		err = cadence_qspi_apb_command_write(base, op);
+		err = cadence_qspi_apb_command_write_setup(plat, op);
+		if (!err)
+			err = cadence_qspi_apb_command_write(plat, op);
 		break;
 	case CQSPI_READ:
 		err = cadence_qspi_apb_read_setup(plat, op);
@@ -289,6 +295,79 @@ static int cadence_spi_mem_exec_op(struct spi_slave *spi,
 	}
 
 	return err;
+}
+
+static int cadence_spi_check_buswidth_req(struct spi_slave *slave, u8 buswidth,
+					  bool tx)
+{
+	u32 mode = slave->mode;
+
+	switch (buswidth) {
+	case 1:
+		return 0;
+
+	case 2:
+		if ((tx && (mode & (SPI_TX_DUAL | SPI_TX_QUAD))) ||
+		    (!tx && (mode & (SPI_RX_DUAL | SPI_RX_QUAD))))
+			return 0;
+
+		break;
+
+	case 4:
+		if ((tx && (mode & SPI_TX_QUAD)) ||
+		    (!tx && (mode & SPI_RX_QUAD)))
+			return 0;
+
+		break;
+	case 8:
+		if ((tx && (mode & SPI_TX_OCTAL)) ||
+		    (!tx && (mode & SPI_RX_OCTAL)))
+			return 0;
+
+		break;
+
+	default:
+		break;
+	}
+
+	return -ENOTSUPP;
+}
+
+static bool cadence_spi_mem_supports_op(struct spi_slave *slave,
+					const struct spi_mem_op *op)
+{
+	bool all_true, all_false;
+
+	if (cadence_spi_check_buswidth_req(slave, op->cmd.buswidth, true))
+		return false;
+
+	if (op->addr.nbytes &&
+	    cadence_spi_check_buswidth_req(slave, op->addr.buswidth, true))
+		return false;
+
+	if (op->dummy.nbytes &&
+	    cadence_spi_check_buswidth_req(slave, op->dummy.buswidth, true))
+		return false;
+
+	if (op->data.nbytes &&
+	    cadence_spi_check_buswidth_req(slave, op->data.buswidth,
+					   op->data.dir == SPI_MEM_DATA_OUT))
+		return false;
+
+	all_true = op->cmd.dtr && op->addr.dtr && op->dummy.dtr &&
+		   op->data.dtr;
+	all_false = !op->cmd.dtr && !op->addr.dtr && !op->dummy.dtr &&
+		    !op->data.dtr;
+
+	/* Mixed DTR modes not supported. */
+	if (!(all_true || all_false))
+		return false;
+
+	/* DTR mode opcodes should be 2 bytes. */
+	if (all_true && op->cmd.nbytes != 2)
+		return false;
+
+	return true;
 }
 
 static int cadence_spi_ofdata_to_platdata(struct udevice *bus)
@@ -348,6 +427,7 @@ static int cadence_spi_ofdata_to_platdata(struct udevice *bus)
 
 static const struct spi_controller_mem_ops cadence_spi_mem_ops = {
 	.exec_op = cadence_spi_mem_exec_op,
+	.supports_op = cadence_spi_mem_supports_op,
 };
 
 static const struct dm_spi_ops cadence_spi_ops = {
