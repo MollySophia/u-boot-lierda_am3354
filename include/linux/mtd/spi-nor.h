@@ -468,6 +468,10 @@ struct flash_info;
  * @rdsr_dummy		dummy cycles needed for Read Status Register command.
  * @rdsr_addr_nbytes:	dummy address bytes needed for Read Status Register
  *			command.
+ * @max_freq:		the maximum frequency the flash can be operated at. 0
+ *			means the controller gets to decide the frequency. This
+ *			is recommended for most cases, except when some commands
+ *			lower need lower speeds like the Read SFDP command.
  * @bank_read_cmd:	Bank read cmd
  * @bank_write_cmd:	Bank write cmd
  * @bank_curr:		Current flash bank
@@ -511,6 +515,7 @@ struct spi_nor {
 	u8			program_opcode;
 	u8			rdsr_dummy;
 	u8			rdsr_addr_nbytes;
+	u32			max_freq;
 #ifdef CONFIG_SPI_FLASH_BAR
 	u8			bank_read_cmd;
 	u8			bank_write_cmd;

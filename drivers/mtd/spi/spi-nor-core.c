@@ -38,6 +38,9 @@
 
 #define ROUND_UP_TO(x, y)	(((x) + (y) - 1) / (y) * (y))
 
+/* SFDP compliant devices must support 50MHz for the Read SFDP command. */
+#define SFDP_HZ					(50U * 1000U * 1000U)
+
 struct sfdp_parameter_header {
 	u8		id_lsb;
 	u8		minor;
@@ -1765,15 +1768,18 @@ static int spi_nor_read_sfdp(struct spi_nor *nor, u32 addr,
 			     size_t len, void *buf)
 {
 	u8 addr_width, read_opcode, read_dummy;
+	u32 max_freq;
 	int ret;
 
 	read_opcode = nor->read_opcode;
 	addr_width = nor->addr_width;
 	read_dummy = nor->read_dummy;
+	max_freq = nor->max_freq;
 
 	nor->read_opcode = SPINOR_OP_RDSFDP;
 	nor->addr_width = 3;
 	nor->read_dummy = 8;
+	nor->max_freq = SFDP_HZ;
 
 	while (len) {
 		ret = nor->read(nor, addr, len, (u8 *)buf);
@@ -1794,6 +1800,7 @@ read_err:
 	nor->read_opcode = read_opcode;
 	nor->addr_width = addr_width;
 	nor->read_dummy = read_dummy;
+	nor->max_freq = max_freq;
 
 	return ret;
 }
