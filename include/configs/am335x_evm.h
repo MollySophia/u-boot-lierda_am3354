@@ -285,6 +285,10 @@
 #endif
 
 /* SPI flash. */
+#if CONFIG_IS_ENABLED(DM_SPI)
+#define AM33XX_SPI_BASE		0x48030000
+#define AM33XX_SPI_OFFSET	(AM33XX_SPI_BASE + OMAP4_MCSPI_REG_OFFSET)
+#endif
 
 /* Network. */
 #define CONFIG_PHY_SMSC

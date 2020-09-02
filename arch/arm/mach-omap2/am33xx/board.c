@@ -12,6 +12,7 @@
 #include <debug_uart.h>
 #include <errno.h>
 #include <ns16550.h>
+#include <omap3_spi.h>
 #include <spl.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
@@ -137,6 +138,17 @@ U_BOOT_DEVICES(am33xx_gpios) = {
 	{ "gpio_omap", &am33xx_gpio[4] },
 	{ "gpio_omap", &am33xx_gpio[5] },
 #endif
+};
+#endif
+#if CONFIG_IS_ENABLED(DM_SPI) && !CONFIG_IS_ENABLED(OF_CONTROL)
+static const struct omap3_spi_plat omap3_spi_pdata = {
+	.regs = (struct mcspi *)AM33XX_SPI_OFFSET,
+	.pin_dir = MCSPI_PINDIR_D0_IN_D1_OUT,
+};
+
+U_BOOT_DEVICE(am33xx_spi) = {
+	.name = "omap3_spi",
+	.platdata = &omap3_spi_pdata,
 };
 #endif
 #endif
