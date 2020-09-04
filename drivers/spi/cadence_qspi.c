@@ -104,13 +104,18 @@ static int cadence_spi_phy_check_pattern(struct cadence_spi_platdata *plat,
 
 	ret = spi_mem_exec_op(spi, &op);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (memcmp(read_data, phy_tuning_pattern,
-		   ARRAY_SIZE(phy_tuning_pattern)))
-		return -EAGAIN;
+		   ARRAY_SIZE(phy_tuning_pattern))) {
+		ret = -EAGAIN;
+		goto out;
+	}
 
-	return 0;
+	ret = 0;
+out:
+	kfree(read_data);
+	return ret;
 }
 
 static int cadence_spi_find_rx_low(struct cadence_spi_platdata *plat,
