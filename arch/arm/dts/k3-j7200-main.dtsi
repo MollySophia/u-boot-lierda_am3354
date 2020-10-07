@@ -334,6 +334,12 @@
 		power-domains = <&k3_pds 193 TI_SCI_PD_EXCLUSIVE>;
 	};
 
+	main_esm: esm@700000 {
+		compatible = "ti,j721e-esm";
+		reg = <0x0 0x700000 0x0 0x1000>;
+		ti,esm-pins = <656>, <657>;
+	};
+
 	usbss0: cdns_usb@4104000 {
 		compatible = "ti,j721e-usb";
 		reg = <0x00 0x4104000 0x00 0x100>;
