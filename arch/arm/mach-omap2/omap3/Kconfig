@@ -86,13 +86,6 @@ config TARGET_OMAP3_OVERO
 	select OMAP3_GPIO_6
 	imply CMD_DM
 
-config TARGET_OMAP3_ZOOM1
-	bool "TI Zoom1"
-	select DM
-	select DM_GPIO
-	select DM_SERIAL
-	imply CMD_DM
-
 config TARGET_AM3517_CRANE
 	bool "am3517_crane"
 
@@ -179,7 +172,6 @@ source "board/timll/devkit8000/Kconfig"
 source "board/ti/evm/Kconfig"
 source "board/isee/igep00x0/Kconfig"
 source "board/overo/Kconfig"
-source "board/logicpd/zoom1/Kconfig"
 source "board/ti/am3517crane/Kconfig"
 source "board/pandora/Kconfig"
 source "board/corscience/tricorder/Kconfig"
