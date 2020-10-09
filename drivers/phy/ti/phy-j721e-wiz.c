@@ -227,7 +227,7 @@ U_BOOT_DRIVER(wiz_div_clk) = {
 	.probe = wiz_div_clk_probe,
 };
 
-int clk_mux_val_to_index(u32 table[4], unsigned int val)
+static int clk_mux_val_to_index(u32 table[4], unsigned int val)
 {
 	int i;
 
