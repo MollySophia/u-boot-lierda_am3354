@@ -192,8 +192,10 @@ static int j721e_ddrss_ofdata_to_priv(struct udevice *dev)
 
 	/* Put DDR pll in bypass mode */
 	ret = clk_set_rate(&ddrss->ddr_clk, clk_get_rate(&ddrss->osc_clk));
-	if (ret)
-		dev_err(dev, "ddr clk bypass failed\n");
+	if (ret < 0)
+		dev_err(dev, "ddr clk bypass failed: %d\n", ret);
+	else
+		ret = 0;
 
 	return ret;
 }
