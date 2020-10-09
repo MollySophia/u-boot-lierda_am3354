@@ -594,4 +594,11 @@ config LIB_DATE
 config ELF
 	bool "enable basic elf loading/validating functions"
 
+config LIB_RATIONAL
+	bool "enable continued fraction calculation routines"
+
+config SPL_LIB_RATIONAL
+	bool "enable continued fraction calculation routines for SPL"
+	depends on SPL
+
 endmenu
