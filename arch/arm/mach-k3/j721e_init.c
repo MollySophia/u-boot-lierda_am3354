@@ -455,6 +455,7 @@ u32 spl_boot_device(void)
 
 #ifdef CONFIG_SYS_K3_SPL_ATF
 
+#define J721E_DEV_A72SS0_CORE0			202
 #define J721E_DEV_MCU_RTI0			262
 #define J721E_DEV_MCU_RTI1			263
 #define J721E_DEV_MCU_ARMSS0_CPU0		250
@@ -473,9 +474,22 @@ void release_resources_for_core_shutdown(void)
 		J721E_DEV_MCU_RTI1,
 	};
 
+	const u32 get_device_ids[] = {
+		J721E_DEV_A72SS0_CORE0
+	};
+
 	ti_sci = get_ti_sci_handle();
 	dev_ops = &ti_sci->ops.dev_ops;
 	proc_ops = &ti_sci->ops.proc_ops;
+
+	/* Iterate through list of devices to get (enable) */
+	for (i = 0; i < ARRAY_SIZE(get_device_ids); i++) {
+		u32 id = get_device_ids[i];
+
+		ret = dev_ops->get_device(ti_sci, id);
+		if (ret)
+			panic("Failed to get device %u (%d)\n", id, ret);
+	}
 
 	/* Iterate through list of devices to put (shutdown) */
 	for (i = 0; i < ARRAY_SIZE(put_device_ids); i++) {
