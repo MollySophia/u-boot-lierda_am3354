@@ -42,6 +42,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #define DESC_TYPE_BOARDCFG_PM_INDEX	0x2
 #define DESC_TYPE_BOARDCFG_RM_INDEX	0x3
 
+#define BOARD_CONFIG_RM_DESC_TYPE	0x000c
+#define BOARD_CONFIG_PM_DESC_TYPE	0x000e
+
 struct extboot_comp {
 	u32 comp_type;
 	u32 boot_core;
@@ -235,7 +238,7 @@ static void k3_sysfw_configure_using_fit(void *fit,
 
 		desc = &bcfg_header->descs[0];
 
-		desc->type = DESC_TYPE_BOARDCFG_PM_INDEX;
+		desc->type = BOARD_CONFIG_PM_DESC_TYPE;
 		desc->offset = sizeof(*bcfg_header);
 		desc->size = cfg_fragment_size;
 		comp->comp_size += desc->size;
@@ -266,7 +269,7 @@ static void k3_sysfw_configure_using_fit(void *fit,
 	if (copy_bcfg) {
 		desc = &bcfg_header->descs[1];
 
-		desc->type = DESC_TYPE_BOARDCFG_RM_INDEX;
+		desc->type = BOARD_CONFIG_RM_DESC_TYPE;
 		desc->size = cfg_fragment_size;
 		comp->comp_size += desc->size;
 		desc->devgrp = 0;
