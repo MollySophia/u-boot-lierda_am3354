@@ -60,16 +60,6 @@ cat << __HEADER_EOF
 			load = <0x9e800000>;
 			entry = <0x9e800000>;
 		};
-		spl {
-			description = "SPL (64-bit)";
-			data = /incbin/("spl/u-boot-spl-nodtb.bin$HS_APPEND");
-			type = "standalone";
-			os = "U-Boot";
-			arch = "arm64";
-			compression = "none";
-			load = <0x80080000>;
-			entry = <0x80080000>;
-		};
 		dm {
 			description = "DM binary";
 			data = /incbin/("$DM");
@@ -79,6 +69,16 @@ cat << __HEADER_EOF
 			os = "DM";
 			load = <0xa0000000>;
 			entry = <0xa0000000>;
+		};
+		spl {
+			description = "SPL (64-bit)";
+			data = /incbin/("spl/u-boot-spl-nodtb.bin$HS_APPEND");
+			type = "standalone";
+			os = "U-Boot";
+			arch = "arm64";
+			compression = "none";
+			load = <0x80080000>;
+			entry = <0x80080000>;
 		};
 __HEADER_EOF
 
@@ -108,7 +108,7 @@ do
 		$(basename $dtname) {
 			description = "$(basename $dtname .dtb)";
 			firmware = "atf";
-			loadables = "tee", "spl", "dm";
+			loadables = "tee", "dm", "spl";
 			fdt = "$(basename $dtname)";
 		};
 __CONF_SECTION_EOF
