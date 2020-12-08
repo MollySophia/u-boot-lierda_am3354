@@ -14,6 +14,10 @@
 #include "j721e_hardware.h"
 #endif
 
+#ifdef CONFIG_SOC_K3_AM642
+#include "am64_hardware.h"
+#endif
+
 /* Assuming these addresses and definitions stay common across K3 devices */
 #define CTRLMMR_WKUP_JTAG_DEVICE_ID	0x43000018
 #define DEVICE_ID_FAMILY_SHIFT	26
