@@ -321,8 +321,8 @@ static int cadence_spi_phy_calibrate(struct cadence_spi_platdata *plat,
 
 	plat->use_phy = true;
 
-	/* Look for RX boundaries at TX = 16. */
-	rxlow.tx = 16;
+	/* Look for RX boundaries at lower TX range. */
+	rxlow.tx = plat->phy_tx_start;
 
 	do {
 		dev_dbg(dev, "Searching for rxlow on TX = %d\n", rxlow.tx);
@@ -348,10 +348,10 @@ static int cadence_spi_phy_calibrate(struct cadence_spi_platdata *plat,
 	 */
 	if (rxlow.read_delay == rxhigh.read_delay) {
 		dev_dbg(dev,
-			"rxlow and rxhigh at the same read delay. Searching at TX = 48\n");
+			"rxlow and rxhigh at the same read delay.\n");
 
-		/* Look for RX boundaries at TX = 48. */
-		temp.tx = 48;
+		/* Look for RX boundaries at upper TX range. */
+		temp.tx = plat->phy_tx_end;
 
 		do {
 			dev_dbg(dev, "Searching for rxlow on TX = %d\n",
@@ -1007,6 +1007,13 @@ static int cadence_spi_ofdata_to_platdata(struct udevice *bus)
 	plat->read_delay = ofnode_read_s32_default(subnode, "cdns,read-delay",
 						   0);
 	plat->has_phy = ofnode_read_bool(subnode, "cdns,phy-mode");
+
+	plat->phy_tx_start = ofnode_read_u32_default(subnode,
+						     "cdns,phy-tx-start",
+						     16);
+	plat->phy_tx_end = ofnode_read_u32_default(subnode,
+						   "cdns,phy-tx-end",
+						   48);
 
 	/* Find the PHY tuning pattern partition. */
 	subnode = ofnode_first_subnode(subnode);

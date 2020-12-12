@@ -33,6 +33,8 @@ struct cadence_spi_platdata {
 	bool		use_phy;
 	u32		phy_pattern_start;
 	struct spi_mem_op phy_read_op;
+	u32		phy_tx_start;
+	u32		phy_tx_end;
 
 	/* Flash parameters */
 	u32		page_size;
