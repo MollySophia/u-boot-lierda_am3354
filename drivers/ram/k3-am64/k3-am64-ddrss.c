@@ -97,11 +97,6 @@ static uint32_t am64_lpddr4_read_ddr_type(void)
 	return dram_class;
 }
 
-static void am64_ddr4_freq_update(void)
-{
-	clk_set_rate(&ddrss->ddr_clk, ddrss->ddr_freq1);
-}
-
 static void am64_lpddr4_freq_update(void)
 {
 	unsigned int req_type, counter;
@@ -155,9 +150,10 @@ static void am64_lpddr4_ack_freq_upd_req(void)
 
 	switch(dram_class) {
 	case DENALI_CTL_0_DRAM_CLASS_DDR4:
-		am64_ddr4_freq_update();
+		debug("Initializing for DDR4\n");
 		break;
 	case DENALI_CTL_0_DRAM_CLASS_LPDDR4:
+		debug("Initializing for LPDDR4\n");
 		am64_lpddr4_freq_update();
 		break;
 	default:
@@ -420,6 +416,14 @@ static int am64_ddrss_probe(struct udevice *dev)
 	am64_lpddr4_probe();
 	am64_lpddr4_init();
 	am64_lpddr4_hardware_reg_init();
+
+	/*
+	 * If using DDR4, configure the PLL one time before
+	 * starting controller.
+	 */
+	if (am64_lpddr4_read_ddr_type() == DENALI_CTL_0_DRAM_CLASS_DDR4)
+		clk_set_rate(&ddrss->ddr_clk, ddrss->ddr_freq1);
+
 	am64_lpddr4_start();
 
 	return ret;
