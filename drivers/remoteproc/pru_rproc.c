@@ -346,6 +346,9 @@ static void pru_set_id(struct pru_privdata *priv, struct udevice *dev)
 	if (device_is_compatible(dev, "ti,am654-rtu"))
 		mask2 = 0x6000;
 
+	if (device_is_compatible(dev, "ti,am654-tx-pru"))
+		mask2 = 0xc000;
+
 	if ((priv->pru_iram & mask2) == mask2)
 		priv->id = 1;
 	else
@@ -391,6 +394,7 @@ static int pru_probe(struct udevice *dev)
 static const struct udevice_id pru_ids[] = {
 	{ .compatible = "ti,am654-pru"},
 	{ .compatible = "ti,am654-rtu"},
+	{ .compatible = "ti,am654-tx-pru" },
 	{}
 };
 
