@@ -29,8 +29,8 @@ struct icssg_flow_cfg {
 #define MSMC_RAM_SIZE_SR1	(SZ_64K + SZ_32K + SZ_2K) /* 0x1880 x 8 x 2 */
 
 #define PRUETH_MAX_RX_MGM_DESC	8
-#define PRUETH_MAX_RX_FLOWS_SR1	4	/* excluding default flow */
-#define PRUETH_RX_FLOW_DATA_SR1	3       /* highest priority flow */
+#define PRUETH_MAX_RX_FLOWS_SR1	1	/* excluding default flow */
+#define PRUETH_RX_FLOW_DATA_SR1	0       /* highest priority flow */
 #define PRUETH_MAX_RX_MGM_FLOWS	2	/* excluding default flow */
 #define PRUETH_RX_MGM_FLOW_RESPONSE	0
 #define PRUETH_RX_MGM_FLOW_TIMESTAMP	1

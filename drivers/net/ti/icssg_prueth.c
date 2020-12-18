@@ -232,7 +232,12 @@ static int prueth_start(struct udevice *dev)
 
 	icssg_class_set_mac_addr(priv->miig_rt, priv->slice,
 				 (u8 *)pdata->enetaddr);
-	icssg_class_default(priv->miig_rt, priv->slice);
+	if (!priv->is_sr1) {
+		icssg_ft1_set_mac_addr(priv->miig_rt, priv->slice,
+				       (u8 *)pdata->enetaddr);
+	}
+
+	icssg_class_default(priv->miig_rt, priv->slice, 1, priv->is_sr1);
 
 	/* To differentiate channels for SLICE0 vs SLICE1 */
 	snprintf(chn_name, sizeof(chn_name), "tx%d-0", priv->slice);
@@ -326,7 +331,7 @@ rx_fail:
 	dma_free(&priv->dma_tx);
 
 tx_fail:
-	icssg_class_disable(priv->miig_rt, priv->slice);
+	icssg_class_disable(priv->miig_rt, priv->slice, priv->is_sr1);
 
 	return ret;
 }
@@ -381,7 +386,7 @@ static void prueth_stop(struct udevice *dev)
 {
 	struct prueth *priv = dev_get_priv(dev);
 
-	icssg_class_disable(priv->miig_rt, priv->slice);
+	icssg_class_disable(priv->miig_rt, priv->slice, priv->is_sr1);
 
 	/* Execute shutdown command at firmware */
 	if (priv->is_sr1) {

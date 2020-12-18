@@ -6,29 +6,14 @@
  */
 
 #include <common.h>
-#include <asm/io.h>
-#include <asm/processor.h>
-#include <clk.h>
-#include <dm.h>
-#include <dm/lists.h>
-#include <dm/device.h>
-#include <dma-uclass.h>
-#include <dm/of_access.h>
-#include <miiphy.h>
-#include <net.h>
-#include <phy.h>
-#include <power-domain.h>
-#include <linux/soc/ti/ti-udma.h>
-#include <syscon.h>
-#include <ti-pruss.h>
+#include <dm/ofnode.h>
 #include <regmap.h>
-
-#include "cpsw_mdio.h"
-#include "icssg_prueth.h"
 
 #define ICSSG_NUM_CLASSIFIERS	16
 #define ICSSG_NUM_FT1_SLOTS	8
 #define ICSSG_NUM_FT3_SLOTS	16
+
+#define ICSSG_NUM_CLASSIFIERS_IN_USE	1
 
 /* Filter 1 - FT1 */
 #define FT1_NUM_SLOTS	8
@@ -45,6 +30,9 @@
 #define FT1_LEN_MASK	GENMASK(19, 16)
 #define FT1_LEN_SHIFT	16
 #define FT1_LEN(len)	(((len) << FT1_LEN_SHIFT) & FT1_LEN_MASK)
+
+#define FT1_START_MASK	GENMASK(14, 0)
+#define FT1_START(start)	((start) & FT1_START_MASK)
 
 #define FT1_MATCH_SLOT(n)	(GENMASK(23, 16) & (BIT(n) << 16))
 
@@ -106,6 +94,8 @@ enum ft1_cfg_type {
 #define RX_CLASS_FT_FT3_MATCH_MASK	GENMASK(15, 0)
 #define RX_CLASS_FT_FT3_MATCH_SHIFT	0
 
+#define RX_CLASS_FT_FT1_MATCH(slot)	((BIT(slot) << RX_CLASS_FT_FT1_MATCH_SHIFT) & RX_CLASS_FT_FT1_MATCH_MASK)
+
 enum rx_class_sel_type {
 	RX_CLASS_SEL_TYPE_OR = 0,
 	RX_CLASS_SEL_TYPE_AND = 1,
@@ -120,7 +110,6 @@ enum rx_class_sel_type {
 #define RX_CLASS_SEL_MASK(n)	(0x3 << RX_CLASS_SEL_SHIFT((n)))
 
 #define ICSSG_CFG_OFFSET	0
-#define RGMII_CFG_OFFSET	4
 
 #define ICSSG_CFG_RX_L2_G_EN	BIT(2)
 
@@ -203,6 +192,49 @@ static struct miig_rt_offsets offs[] = {
 	},
 };
 
+static inline u32 addr_to_da0(const u8 *addr)
+{
+	return (u32)(addr[0] | addr[1] << 8 |
+		addr[2] << 16 | addr[3] << 24);
+};
+
+static inline u32 addr_to_da1(const u8 *addr)
+{
+	return (u32)(addr[4] | addr[5] << 8);
+};
+
+static void rx_class_ft1_set_start_len(struct regmap *miig_rt, int slice,
+				       u16 start, u8 len)
+{
+	u32 offset, val;
+
+	offset = offs[slice].ft1_start_len;
+	val = FT1_LEN(len) | FT1_START(start);
+	regmap_write(miig_rt, offset, val);
+}
+
+static void rx_class_ft1_set_da(struct regmap *miig_rt, int slice,
+				int n, const u8 *addr)
+{
+	u32 offset;
+
+	offset = FT1_N_REG(slice, n, FT1_DA0);
+	regmap_write(miig_rt, offset, addr_to_da0(addr));
+	offset = FT1_N_REG(slice, n, FT1_DA1);
+	regmap_write(miig_rt, offset, addr_to_da1(addr));
+}
+
+static void rx_class_ft1_set_da_mask(struct regmap *miig_rt, int slice,
+				     int n, const u8 *addr)
+{
+	u32 offset;
+
+	offset = FT1_N_REG(slice, n, FT1_DA0_MASK);
+	regmap_write(miig_rt, offset, addr_to_da0(addr));
+	offset = FT1_N_REG(slice, n, FT1_DA1_MASK);
+	regmap_write(miig_rt, offset, addr_to_da1(addr));
+}
+
 static void rx_class_ft1_cfg_set_type(struct regmap *miig_rt, int slice, int n,
 				      enum ft1_cfg_type type)
 {
@@ -241,157 +273,116 @@ static void rx_class_set_or(struct regmap *miig_rt, int slice, int n,
 	regmap_write(miig_rt, offset, data);
 }
 
-/* disable all RX traffic */
-void icssg_class_disable(struct regmap *miig_rt, int slice)
+void icssg_class_set_mac_addr(struct regmap *miig_rt, int slice, u8 *mac)
+{
+	regmap_write(miig_rt, offs[slice].mac0, addr_to_da0(mac));
+	regmap_write(miig_rt, offs[slice].mac1, addr_to_da1(mac));
+}
+
+void icssg_class_disable_n(struct regmap *miig_rt, int slice, int n)
 {
 	u32 data, offset;
+
+	/* AND_EN = 0 */
+	rx_class_set_and(miig_rt, slice, n, 0);
+	/* OR_EN = 0 */
+	rx_class_set_or(miig_rt, slice, n, 0);
+
+	/* set CFG1 to OR */
+	rx_class_sel_set_type(miig_rt, slice, n, RX_CLASS_SEL_TYPE_OR);
+
+	/* configure gate */
+	offset = RX_CLASS_GATES_N_REG(slice, n);
+	regmap_read(miig_rt, offset, &data);
+	/* clear class_raw so we go through filters */
+	data &= ~RX_CLASS_GATES_RAW_MASK;
+	/* set allow and phase mask */
+	data |= RX_CLASS_GATES_ALLOW_MASK | RX_CLASS_GATES_PHASE_MASK;
+	regmap_write(miig_rt, offset, data);
+}
+
+/* disable all RX traffic */
+void icssg_class_disable(struct regmap *miig_rt, int slice, bool is_sr1)
+{
 	int n;
 
 	/* Enable RX_L2_G */
 	regmap_update_bits(miig_rt, ICSSG_CFG_OFFSET, ICSSG_CFG_RX_L2_G_EN,
 			   ICSSG_CFG_RX_L2_G_EN);
 
-	for (n = 0; n < ICSSG_NUM_CLASSIFIERS; n++) {
-		/* AND_EN = 0 */
-		rx_class_set_and(miig_rt, slice, n, 0);
-		/* OR_EN = 0 */
-		rx_class_set_or(miig_rt, slice, n, 0);
+	for (n = 0; n < ICSSG_NUM_CLASSIFIERS; n++)
+		icssg_class_disable_n(miig_rt, slice, n);
 
-		/* set CFG1 to OR */
-		rx_class_sel_set_type(miig_rt, slice, n, RX_CLASS_SEL_TYPE_OR);
+	/* Exclusively disable classifier 4 for SR1.0 */
+	if (is_sr1)
+		icssg_class_disable_n(miig_rt, slice, 4);
 
-		/* configure gate */
-		offset = RX_CLASS_GATES_N_REG(slice, n);
-		regmap_read(miig_rt, offset, &data);
-		/* clear class_raw */
-		data &= ~RX_CLASS_GATES_RAW_MASK;
-		/* set allow and phase mask */
-		data |= RX_CLASS_GATES_ALLOW_MASK | RX_CLASS_GATES_PHASE_MASK;
-		regmap_write(miig_rt, offset, data);
+	/* FT1 Disabled */
+	for (n = 0; n < ICSSG_NUM_FT1_SLOTS; n++) {
+		u8 addr[] = { 0, 0, 0, 0, 0, 0, };
+
+		rx_class_ft1_cfg_set_type(miig_rt, slice, n,
+					  FT1_CFG_TYPE_DISABLED);
+		rx_class_ft1_set_da(miig_rt, slice, n, addr);
+		rx_class_ft1_set_da_mask(miig_rt, slice, n, addr);
 	}
 
-	/* FT1 uses 6 bytes of DA address */
-	offset = offs[slice].ft1_start_len;
-	regmap_write(miig_rt, offset, FT1_LEN(6));
-
-	/* FT1 type EQ */
-	for (n = 0; n < ICSSG_NUM_FT1_SLOTS; n++)
-		rx_class_ft1_cfg_set_type(miig_rt, slice, n, FT1_CFG_TYPE_EQ);
-
-	/* FT1[0] DA compare address 00-00-00-00-00-00 */
-	offset = FT1_N_REG(slice, 0, FT1_DA0);
-	regmap_write(miig_rt, offset, 0);
-	offset = FT1_N_REG(slice, 0, FT1_DA1);
-	regmap_write(miig_rt, offset, 0);
-
-	/* FT1[0] mask FE-FF-FF-FF-FF-FF */
-	offset = FT1_N_REG(slice, 0, FT1_DA0_MASK);
-	regmap_write(miig_rt, offset, 0);
-	offset = FT1_N_REG(slice, 0, FT1_DA1_MASK);
-	regmap_write(miig_rt, offset, 0);
-
 	/* clear CFG2 */
 	regmap_write(miig_rt, offs[slice].rx_class_cfg2, 0);
 }
 
-void icssg_class_default(struct regmap *miig_rt, int slice)
-{
-	u32 offset, data;
-	int n;
-
-	/* defaults */
-	icssg_class_disable(miig_rt, slice);
-
-	/* FT1 uses 6 bytes of DA address */
-	offset = offs[slice].ft1_start_len;
-	regmap_write(miig_rt, offset, FT1_LEN(6));
-
-	/* FT1 slots to EQ */
-	for (n = 0; n < ICSSG_NUM_FT1_SLOTS; n++)
-		rx_class_ft1_cfg_set_type(miig_rt, slice, n, FT1_CFG_TYPE_EQ);
-
-	/* FT1[0] DA compare address 00-00-00-00-00-00 */
-	offset = FT1_N_REG(slice, 0, FT1_DA0);
-	regmap_write(miig_rt, offset, 0);
-	offset = FT1_N_REG(slice, 0, FT1_DA1);
-	regmap_write(miig_rt, offset, 0);
-
-	/* FT1[0] mask 00-00-00-00-00-00 */
-	offset = FT1_N_REG(slice, 0, FT1_DA0_MASK);
-	regmap_write(miig_rt, offset, 0);
-	offset = FT1_N_REG(slice, 0, FT1_DA1_MASK);
-	regmap_write(miig_rt, offset, 0);
-
-	/* Setup Classifier 4 */
-	/* match on Broadcast or MAC_PRU address */
-	data = RX_CLASS_FT_BC | RX_CLASS_FT_DA_P;
-	rx_class_set_or(miig_rt, slice, 4, data);
-
-	/* set CFG1 for OR_OR_AND for classifier 4 */
-	rx_class_sel_set_type(miig_rt, slice, 4, RX_CLASS_SEL_TYPE_OR_OR_AND);
-
-	/* ungate classifier 4 */
-	offset = RX_CLASS_GATES_N_REG(slice, 4);
-	regmap_read(miig_rt, offset, &data);
-	data |= RX_CLASS_GATES_RAW_MASK;
-	regmap_write(miig_rt, offset, data);
-
-	/* clear CFG2 */
-	regmap_write(miig_rt, offs[slice].rx_class_cfg2, 0);
-}
-
-void icssg_class_promiscuous(struct regmap *miig_rt, int slice)
+void icssg_class_default(struct regmap *miig_rt, int slice, bool allmulti,
+			 bool is_sr1)
 {
 	u32 data;
-	u32 offset;
 	int n;
 
 	/* defaults */
-	icssg_class_disable(miig_rt, slice);
+	icssg_class_disable(miig_rt, slice, is_sr1);
 
-	/* FT1 uses 6 bytes of DA address */
-	offset = offs[slice].ft1_start_len;
-	regmap_write(miig_rt, offset, FT1_LEN(6));
+	/* Setup Classifier */
+	for (n = 0; n < ICSSG_NUM_CLASSIFIERS_IN_USE; n++) {
+		/* match on Broadcast or MAC_PRU address */
+		data = RX_CLASS_FT_BC | RX_CLASS_FT_DA_P;
 
-	/* FT1 type EQ */
-	for (n = 0; n < ICSSG_NUM_FT1_SLOTS; n++)
-		rx_class_ft1_cfg_set_type(miig_rt, slice, n, FT1_CFG_TYPE_EQ);
+		/* multicast? */
+		if (allmulti)
+			data |= RX_CLASS_FT_MC;
 
-	/* FT1[0] DA compare address 00-00-00-00-00-00 */
-	offset = FT1_N_REG(slice, 0, FT1_DA0);
-	regmap_write(miig_rt, offset, 0);
-	offset = FT1_N_REG(slice, 0, FT1_DA1);
-	regmap_write(miig_rt, offset, 0);
+		rx_class_set_or(miig_rt, slice, n, data);
 
-	/* FT1[0] mask FE-FF-FF-FF-FF-FF */
-	offset = FT1_N_REG(slice, 0, FT1_DA0_MASK);
-	regmap_write(miig_rt, offset, 0xfffffffe);
-	offset = FT1_N_REG(slice, 0, FT1_DA1_MASK);
-	regmap_write(miig_rt, offset, 0xffff);
+		/* set CFG1 for OR_OR_AND for classifier */
+		rx_class_sel_set_type(miig_rt, slice, n,
+				      RX_CLASS_SEL_TYPE_OR_OR_AND);
+	}
 
-	/* Setup Classifier 4 */
-	/* match on multicast, broadcast or unicast (ft1-0 address) */
-	data = RX_CLASS_FT_MC | RX_CLASS_FT_BC | FT1_MATCH_SLOT(0);
-	rx_class_set_or(miig_rt, slice, 4, data);
+	/* SR1.0 requires classifier 4 as global traffic enable */
+	if (is_sr1) {
+		/* match on Broadcast or MAC_PRU address */
+		data = RX_CLASS_FT_BC | RX_CLASS_FT_DA_P;
 
-	/* set CFG1 for OR_OR_AND for classifier 4 */
-	rx_class_sel_set_type(miig_rt, slice, 4, RX_CLASS_SEL_TYPE_OR_OR_AND);
+		/* multicast? */
+		if (allmulti)
+			data |= RX_CLASS_FT_MC;
 
-	/* ungate classifier 4 */
-	offset = RX_CLASS_GATES_N_REG(slice, 4);
-	regmap_read(miig_rt, offset, &data);
-	data |= RX_CLASS_GATES_RAW_MASK;
-	regmap_write(miig_rt, offset, data);
+		rx_class_set_or(miig_rt, slice, 4, data);
+
+		/* set CFG1 for OR_OR_AND for classifier */
+		rx_class_sel_set_type(miig_rt, slice, 4,
+				      RX_CLASS_SEL_TYPE_OR_OR_AND);
+	}
+
+	/* clear CFG2 */
+	regmap_write(miig_rt, offs[slice].rx_class_cfg2, 0);
 }
 
-void icssg_class_set_mac_addr(struct regmap *miig_rt, int slice, u8 *mac)
+/* required for SR2 for SAV check */
+void icssg_ft1_set_mac_addr(struct regmap *miig_rt, int slice, u8 *mac_addr)
 {
-	u32 mac0, mac1;
+	u8 mask_addr[] = { 0, 0, 0, 0, 0, 0, };
 
-	mac0 = mac[0] | mac[1] << 8 |
-		mac[2] << 16 | mac[3] << 24;
-	mac1 = mac[4] | mac[5] << 8;
-
-	regmap_write(miig_rt, offs[slice].mac0, mac0);
-	regmap_write(miig_rt, offs[slice].mac1, mac1);
+	rx_class_ft1_set_start_len(miig_rt, slice, 0, 6);
+	rx_class_ft1_set_da(miig_rt, slice, 0, mac_addr);
+	rx_class_ft1_set_da_mask(miig_rt, slice, 0, mask_addr);
+	rx_class_ft1_cfg_set_type(miig_rt, slice, 0, FT1_CFG_TYPE_EQ);
 }
