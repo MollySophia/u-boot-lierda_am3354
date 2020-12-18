@@ -24,7 +24,7 @@
 #include <regmap.h>
 
 #include "cpsw_mdio.h"
-#include "icssg.h"
+#include "icssg_prueth.h"
 
 #define ICSSG_NUM_CLASSIFIERS	16
 #define ICSSG_NUM_FT1_SLOTS	8

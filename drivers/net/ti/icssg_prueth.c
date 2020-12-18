@@ -28,7 +28,7 @@
 #include <ti-pruss.h>
 
 #include "cpsw_mdio.h"
-#include "icssg.h"
+#include "icssg_prueth.h"
 
 #define ICSS_SLICE0     0
 #define ICSS_SLICE1     1
