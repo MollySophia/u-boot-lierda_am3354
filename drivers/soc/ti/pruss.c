@@ -120,6 +120,29 @@ int pruss_release_mem_region(struct udevice *dev,
 }
 
 /**
+ * pruss_cfg_update() - configure a PRUSS CFG sub-module register
+ * @dev: the pruss device
+ * @reg: register offset within the CFG sub-module
+ * @mask: bit mask to use for programming the @val
+ * @val: value to write
+ *
+ * Programs a given register within the PRUSS CFG sub-module
+ *
+ * Returns 0 on success, or an error code otherwise
+ */
+int pruss_cfg_update(struct udevice *dev, unsigned int reg,
+		     unsigned int mask, unsigned int val)
+{
+	struct pruss *pruss;
+
+	pruss = dev_get_priv(dev);
+	if (IS_ERR_OR_NULL(pruss))
+		return -EINVAL;
+
+	return regmap_update_bits(pruss->cfg, reg, mask, val);
+}
+
+/**
  * pruss_probe() - Basic probe
  * @dev:	corresponding k3 device
  *
@@ -130,7 +153,6 @@ static int pruss_probe(struct udevice *dev)
 	struct pruss *priv;
 	int ret, idx;
 	ofnode sub_node, node, memories;
-	struct regmap *regmap_cfg;
 	struct udevice *syscon;
 	const char *mem_names[PRUSS_MEM_MAX] = { "dram0", "dram1", "shrdram2" };
 	int i;
@@ -138,7 +160,6 @@ static int pruss_probe(struct udevice *dev)
 	priv = dev_get_priv(dev);
 	node = dev_ofnode(dev);
 	priv->dev = dev;
-	sub_node = ofnode_find_subnode(node, "cfg");
 	memories = ofnode_find_subnode(node, "memories");
 
 	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
@@ -147,10 +168,16 @@ static int pruss_probe(struct udevice *dev)
 						       (u64 *)&priv->mem_regions[i].size);
 	}
 
+	sub_node = ofnode_find_subnode(node, "cfg");
 	ret = uclass_get_device_by_ofnode(UCLASS_SYSCON, sub_node,
 					  &syscon);
 
-	regmap_cfg = syscon_get_regmap(syscon);
+	priv->cfg = syscon_get_regmap(syscon);
+	if (IS_ERR(priv->cfg)) {
+		dev_err(dev, "unable to get cfg regmap (%ld)\n",
+			PTR_ERR(priv->cfg));
+		return -ENODEV;
+	}
 
 	/*
 	 * The CORE block uses two multiplexers to allow software to
@@ -160,12 +187,12 @@ static int pruss_probe(struct udevice *dev)
 	 * bit & ICSSG_IEPCLK_REG[0] IEP_OCP_CLK_EN bit in order to select the
 	 * clock source to the CORE block.
 	 */
-	ret = regmap_update_bits(regmap_cfg, ICSSG_CFG_CORE_SYNC,
+	ret = regmap_update_bits(priv->cfg, ICSSG_CFG_CORE_SYNC,
 				 ICSSG_CORE_VBUSP_SYNC_EN,
 				 ICSSG_CORE_VBUSP_SYNC_EN);
 	if (ret)
 		return ret;
-	ret = regmap_update_bits(regmap_cfg, PRUSS_CFG_IEPCLK,
+	ret = regmap_update_bits(priv->cfg, PRUSS_CFG_IEPCLK,
 				 PRUSS_IEPCLK_IEP_OCP_CLK_EN,
 				 PRUSS_IEPCLK_IEP_OCP_CLK_EN);
 	if (ret)

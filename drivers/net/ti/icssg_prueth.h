@@ -38,15 +38,6 @@ enum prueth_port {
 	PRUETH_PORT_MII1,	/* physical port MII 1 */
 };
 
-/**
- * enum pruss_pru_id - PRU core identifiers
- */
-enum pruss_pru_id {
-	PRUSS_PRU0 = 0,
-	PRUSS_PRU1,
-	PRUSS_NUM_PRUS,
-};
-
 struct prueth {
 	struct udevice		*dev;
 	struct regmap		*miig_rt;
