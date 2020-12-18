@@ -10,14 +10,6 @@
 
 #include <regmap.h>
 
-/**
- * TX IPG Values to be set for 100M and 1G link speeds.  These values are
- * in ocp_clk cycles. So need change if ocp_clk is changed for a specific
- * h/w design.
- */
-#define MII_RT_TX_IPG_100M	0x166
-#define MII_RT_TX_IPG_1G	0x18
-
 #define RGMII_CFG_OFFSET	4
 
 /* Constant to choose between MII0 and MII1 */
@@ -48,6 +40,20 @@
 #define PRUSS_MII_RT_RX_ERR0		0x50
 #define PRUSS_MII_RT_RX_ERR1		0x54
 
+static inline void icssg_mii_update_ipg(struct regmap *mii_rt, int mii, u32 ipg)
+{
+	u32 val;
+
+	if (mii == ICSS_MII0) {
+		regmap_write(mii_rt, PRUSS_MII_RT_TX_IPG0, ipg);
+	} else {
+		/* Errata workaround: IEP1 is not read by h/w unless IEP0 is written */
+		regmap_read(mii_rt, PRUSS_MII_RT_TX_IPG0, &val);
+		regmap_write(mii_rt, PRUSS_MII_RT_TX_IPG1, ipg);
+		regmap_write(mii_rt, PRUSS_MII_RT_TX_IPG0, val);
+	}
+}
+
 static inline void icssg_update_rgmii_cfg(struct regmap *miig_rt, bool gig_en,
 					  bool full_duplex, int mii)
 {
@@ -65,28 +71,6 @@ static inline void icssg_update_rgmii_cfg(struct regmap *miig_rt, bool gig_en,
 		full_duplex_val = full_duplex_mask;
 	regmap_update_bits(miig_rt, RGMII_CFG_OFFSET, full_duplex_mask,
 			   full_duplex_val);
-}
-
-static inline void icssg_update_mii_rt_cfg(struct regmap *mii_rt, int speed,
-					   int mii)
-{
-	u32 ipg_reg, val;
-
-	ipg_reg = (mii == ICSS_MII0) ? PRUSS_MII_RT_TX_IPG0 :
-				       PRUSS_MII_RT_TX_IPG1;
-	switch (speed) {
-	case SPEED_1000:
-		val = MII_RT_TX_IPG_1G;
-		break;
-	case SPEED_100:
-		val = MII_RT_TX_IPG_100M;
-		break;
-	default:
-		/* Other links speeds not supported */
-		pr_err("Unsupported link speed\n");
-		return;
-	}
-	regmap_write(mii_rt, ipg_reg, val);
 }
 
 #endif /* __NET_PRUSS_MII_RT_H__ */

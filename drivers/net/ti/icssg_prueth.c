@@ -246,7 +246,7 @@ static int icssg_update_link(struct prueth *priv)
 		icssg_update_rgmii_cfg(priv->miig_rt, gig_en, full_duplex,
 				       priv->slice);
 		/* update the Tx IPG based on 100M/1G speed */
-		icssg_update_mii_rt_cfg(priv->mii_rt, phy->speed, priv->slice);
+		icssg_config_ipg(priv, phy->speed, priv->slice);
 
 		/* send command to firmware to update speed/duplex setting */
 		icssg_change_port_speed_duplex(priv, full_duplex, phy->speed);
