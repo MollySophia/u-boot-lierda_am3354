@@ -51,7 +51,6 @@ struct pruss {
 	struct pruss_mem_region *mem_in_use[PRUSS_MEM_MAX];
 };
 
-int pruss_request_shrmem_region(struct udevice *dev, phys_addr_t *loc);
 int pruss_request_tm_region(struct udevice *dev, phys_addr_t *loc);
 int pruss_request_mem_region(struct udevice *dev, enum pruss_mem mem_id,
 			     struct pruss_mem_region *region);

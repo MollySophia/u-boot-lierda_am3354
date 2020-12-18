@@ -119,23 +119,6 @@ int pruss_release_mem_region(struct udevice *dev,
 	return 0;
 }
 
-/*
- * pruss_request_shrmem_region() - Request pruss for shared memory region
- * @dev:       corresponding k3 device
- * @loc:       the shared memory physical address
- * Return: 0 if all goes good, else appropriate error message.
- */
-int pruss_request_shrmem_region(struct udevice *dev, phys_addr_t *loc)
-{
-	struct pruss_mem_region region;
-	int ret;
-
-	ret = pruss_request_mem_region(dev, PRUSS_MEM_SHRD_RAM2, &region);
-	*loc = region.pa;
-
-	return ret;
-}
-
 /**
  * pruss_probe() - Basic probe
  * @dev:	corresponding k3 device
