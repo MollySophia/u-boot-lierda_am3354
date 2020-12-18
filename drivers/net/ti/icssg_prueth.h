@@ -5,6 +5,20 @@
  * Copyright (C) 2019, Texas Instruments, Incorporated
  *
  */
+
+#ifndef __NET_TI_ICSSG_PRUETH_H
+#define __NET_TI_ICSSG_PRUETH_H
+
+#include <common.h>
+#include <asm/io.h>
+#include <clk.h>
+#include <dm.h>
+#include <dm/lists.h>
+#include <dm/ofnode.h>
+#include <dm/device.h>
+#include <dma-uclass.h>
+#include <regmap.h>
+
 void icssg_class_set_mac_addr(struct regmap *miig_rt, int slice, u8 *mac);
 void icssg_class_disable(struct regmap *miig_rt, int slice);
 void icssg_class_default(struct regmap *miig_rt, int slice);
@@ -29,3 +43,56 @@ struct icssg_config {
 	__le32 rtu_status;	/* RTU status */
 	__le32 info;		/* reserved */
 } __packed;
+
+enum prueth_mac {
+	PRUETH_MAC0 = 0,
+	PRUETH_MAC1,
+	PRUETH_NUM_MACS,
+};
+
+enum prueth_port {
+	PRUETH_PORT_HOST = 0,	/* host side port */
+	PRUETH_PORT_MII0,	/* physical port MII 0 */
+	PRUETH_PORT_MII1,	/* physical port MII 1 */
+};
+
+/**
+ * enum pruss_pru_id - PRU core identifiers
+ */
+enum pruss_pru_id {
+	PRUSS_PRU0 = 0,
+	PRUSS_PRU1,
+	PRUSS_NUM_PRUS,
+};
+
+struct prueth {
+	struct udevice		*dev;
+	struct regmap		*miig_rt;
+	struct regmap		*mii_rt;
+	fdt_addr_t		mdio_base;
+	phys_addr_t		pruss_shrdram2;
+	phys_addr_t		tmaddr;
+	struct mii_dev		*bus;
+	u32			port_id;
+	u32			sram_pa;
+	struct phy_device	*phydev;
+	bool			has_phy;
+	ofnode			phy_node;
+	u32			phy_addr;
+	ofnode			eth_node[PRUETH_NUM_MACS];
+	struct icssg_config	config[PRUSS_NUM_PRUS];
+	u32			mdio_freq;
+	int			phy_interface;
+	struct			clk mdiofck;
+	struct dma		dma_tx;
+	struct dma		dma_rx;
+	struct dma		dma_rx_mgm;
+	u32			rx_next;
+	u32			rx_pend;
+	int			slice;
+};
+
+/* config helpers */
+void icssg_config_ipg(struct prueth *prueth, int speed, int mii);
+
+#endif /* __NET_TI_ICSSG_PRUETH_H */

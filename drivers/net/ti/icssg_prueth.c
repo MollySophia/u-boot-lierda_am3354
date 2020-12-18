@@ -29,6 +29,7 @@
 
 #include "cpsw_mdio.h"
 #include "icssg_prueth.h"
+#include "icss_mii_rt.h"
 
 #define ICSS_SLICE0     0
 #define ICSS_SLICE1     1
@@ -44,18 +45,6 @@
 #else
 #define UDMA_RX_DESC_NUM 4
 #endif
-
-enum prueth_mac {
-	PRUETH_MAC0 = 0,
-	PRUETH_MAC1,
-	PRUETH_NUM_MACS,
-};
-
-enum prueth_port {
-	PRUETH_PORT_HOST = 0,	/* host side port */
-	PRUETH_PORT_MII0,	/* physical port MII 0 */
-	PRUETH_PORT_MII1,	/* physical port MII 1 */
-};
 
 /* Config region lies in shared RAM */
 #define ICSS_CONFIG_OFFSET_SLICE0	0
@@ -105,124 +94,9 @@ enum prueth_port {
 #define ICSSG_RX_CHAN_FLOW_ID		0 /* flow id for host port */
 #define ICSSG_RX_MGM_CHAN_FLOW_ID	1 /* flow id for command response */
 
-/**
- * enum pruss_pru_id - PRU core identifiers
- */
-enum pruss_pru_id {
-	PRUSS_PRU0 = 0,
-	PRUSS_PRU1,
-	PRUSS_NUM_PRUS,
-};
-
-struct prueth {
-	struct udevice		*dev;
-	struct regmap		*miig_rt;
-	struct regmap		*mii_rt;
-	fdt_addr_t		mdio_base;
-	phys_addr_t		pruss_shrdram2;
-	phys_addr_t		tmaddr;
-	struct mii_dev		*bus;
-	u32			port_id;
-	u32			sram_pa;
-	struct phy_device	*phydev;
-	bool			has_phy;
-	ofnode			phy_node;
-	u32			phy_addr;
-	ofnode			eth_node[PRUETH_NUM_MACS];
-	struct icssg_config	config[PRUSS_NUM_PRUS];
-	u32			mdio_freq;
-	int			phy_interface;
-	struct			clk mdiofck;
-	struct dma		dma_tx;
-	struct dma		dma_rx;
-	struct dma		dma_rx_mgm;
-	u32			rx_next;
-	u32			rx_pend;
-	int			slice;
-};
-
-/**
- * TX IPG Values to be set for 100M and 1G link speeds.  These values are
- * in ocp_clk cycles. So need change if ocp_clk is changed for a specific
- * h/w design.
- */
-#define MII_RT_TX_IPG_100M	0x166
-#define MII_RT_TX_IPG_1G	0x18
-
-#define RGMII_CFG_OFFSET	4
-
-/* Constant to choose between MII0 and MII1 */
-#define ICSS_MII0	0
-#define ICSS_MII1	1
-
-/* RGMII CFG Register bits */
-#define RGMII_CFG_GIG_EN_MII0	BIT(17)
-#define RGMII_CFG_GIG_EN_MII1	BIT(21)
-#define RGMII_CFG_FULL_DUPLEX_MII0	BIT(18)
-#define RGMII_CFG_FULL_DUPLEX_MII1	BIT(22)
-
-/* PRUSS_MII_RT Registers */
-#define PRUSS_MII_RT_RXCFG0		0x0
-#define PRUSS_MII_RT_RXCFG1		0x4
-#define PRUSS_MII_RT_TXCFG0		0x10
-#define PRUSS_MII_RT_TXCFG1		0x14
-#define PRUSS_MII_RT_TX_CRC0		0x20
-#define PRUSS_MII_RT_TX_CRC1		0x24
-#define PRUSS_MII_RT_TX_IPG0		0x30
-#define PRUSS_MII_RT_TX_IPG1		0x34
-#define PRUSS_MII_RT_PRS0		0x38
-#define PRUSS_MII_RT_PRS1		0x3c
-#define PRUSS_MII_RT_RX_FRMS0		0x40
-#define PRUSS_MII_RT_RX_FRMS1		0x44
-#define PRUSS_MII_RT_RX_PCNT0		0x48
-#define PRUSS_MII_RT_RX_PCNT1		0x4c
-#define PRUSS_MII_RT_RX_ERR0		0x50
-#define PRUSS_MII_RT_RX_ERR1		0x54
-
 /* Management frames are sent/received one at a time */
 #define MGMT_PKT_SIZE			128
 static uchar mgm_pkt_rx[MGMT_PKT_SIZE];
-
-static inline void icssg_update_rgmii_cfg(struct regmap *miig_rt, bool gig_en,
-					  bool full_duplex, int mii)
-{
-	u32 gig_en_mask, gig_val = 0, full_duplex_mask, full_duplex_val = 0;
-
-	gig_en_mask = (mii == ICSS_MII0) ? RGMII_CFG_GIG_EN_MII0 :
-					RGMII_CFG_GIG_EN_MII1;
-	if (gig_en)
-		gig_val = gig_en_mask;
-	regmap_update_bits(miig_rt, RGMII_CFG_OFFSET, gig_en_mask, gig_val);
-
-	full_duplex_mask = (mii == ICSS_MII0) ? RGMII_CFG_FULL_DUPLEX_MII0 :
-					   RGMII_CFG_FULL_DUPLEX_MII1;
-	if (full_duplex)
-		full_duplex_val = full_duplex_mask;
-	regmap_update_bits(miig_rt, RGMII_CFG_OFFSET, full_duplex_mask,
-			   full_duplex_val);
-}
-
-static inline void icssg_update_mii_rt_cfg(struct regmap *mii_rt, int speed,
-					   int mii)
-{
-	u32 ipg_reg, val;
-
-	ipg_reg = (mii == ICSS_MII0) ? PRUSS_MII_RT_TX_IPG0 :
-				       PRUSS_MII_RT_TX_IPG1;
-	switch (speed) {
-	case SPEED_1000:
-		val = MII_RT_TX_IPG_1G;
-		break;
-	case SPEED_100:
-		val = MII_RT_TX_IPG_100M;
-		break;
-	default:
-		/* Other links speeds not supported */
-		pr_err("Unsupported link speed\n");
-		return;
-	}
-	regmap_write(mii_rt, ipg_reg, val);
-}
 
 static int icssg_phy_init(struct udevice *dev)
 {
