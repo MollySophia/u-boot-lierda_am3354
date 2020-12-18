@@ -403,6 +403,7 @@
 			interrupt-parent = <&icssg0_intc>;
 			interrupts = <16>, <17>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru0_0";
 		};
 
 		rtu0_0: rtu@4000 {
@@ -415,6 +416,7 @@
 			interrupt-parent = <&icssg0_intc>;
 			interrupts = <20>, <21>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu0_0";
 		};
 
 		tx_pru0_0: txpru@a000 {
@@ -424,6 +426,7 @@
 			      <0x25400 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru0_0-fw";
+			remoteproc-name = "tx_pru0_0";
 		};
 
 		pru0_1: pru@38000 {
@@ -436,6 +439,7 @@
 			interrupt-parent = <&icssg0_intc>;
 			interrupts = <18>, <19>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru0_1";
 		};
 
 		rtu0_1: rtu@6000 {
@@ -448,6 +452,7 @@
 			interrupt-parent = <&icssg0_intc>;
 			interrupts = <22>, <23>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu0_1";
 		};
 
 		tx_pru0_1: txpru@c000 {
@@ -457,6 +462,7 @@
 			      <0x25c00 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru0_1-fw";
+			remoteproc-name = "tx_pru0_1";
 		};
 
 		icssg0_mdio: mdio@32400 {
@@ -561,6 +567,7 @@
 			interrupt-parent = <&icssg1_intc>;
 			interrupts = <16>, <17>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru1_0";
 		};
 
 		rtu1_0: rtu@4000 {
@@ -573,6 +580,7 @@
 			interrupt-parent = <&icssg1_intc>;
 			interrupts = <20>, <21>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu1_0";
 		};
 
 		tx_pru1_0: txpru@a000 {
@@ -582,6 +590,7 @@
 			      <0x25400 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru1_0-fw";
+			remoteproc-name = "txpru1_0";
 		};
 
 		pru1_1: pru@38000 {
@@ -594,6 +603,7 @@
 			interrupt-parent = <&icssg1_intc>;
 			interrupts = <18>, <19>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru1_1";
 		};
 
 		rtu1_1: rtu@6000 {
@@ -606,6 +616,7 @@
 			interrupt-parent = <&icssg1_intc>;
 			interrupts = <22>, <23>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu1_1";
 		};
 
 		tx_pru1_1: txpru@c000 {
@@ -615,6 +626,7 @@
 			      <0x25c00 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru1_1-fw";
+			remoteproc-name = "txpru1_1";
 		};
 
 		icssg1_mdio: mdio@32400 {
@@ -719,6 +731,7 @@
 			interrupt-parent = <&icssg2_intc>;
 			interrupts = <16>, <17>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru2_0";
 		};
 
 		rtu2_0: rtu@4000 {
@@ -731,6 +744,7 @@
 			interrupt-parent = <&icssg2_intc>;
 			interrupts = <20>, <21>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu2_0";
 		};
 
 		tx_pru2_0: txpru@a000 {
@@ -740,6 +754,7 @@
 			      <0x25400 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru2_0-fw";
+			remoteproc-name = "txpru2_0";
 		};
 
 		pru2_1: pru@38000 {
@@ -752,6 +767,7 @@
 			interrupt-parent = <&icssg2_intc>;
 			interrupts = <18>, <19>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "pru2_1";
 		};
 
 		rtu2_1: rtu@6000 {
@@ -764,6 +780,7 @@
 			interrupt-parent = <&icssg2_intc>;
 			interrupts = <22>, <23>;
 			interrupt-names = "vring", "kick";
+			remoteproc-name = "rtu2_2";
 		};
 
 		tx_pru2_1: txpru@c000 {
@@ -773,6 +790,7 @@
 			      <0x25c00 0x100>;
 			reg-names = "iram", "control", "debug";
 			firmware-name = "am65x-txpru2_1-fw";
+			remoteproc-name = "txpru2_1";
 		};
 
 		icssg2_mdio: mdio@32400 {
