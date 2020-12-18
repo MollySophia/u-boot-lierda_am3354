@@ -207,4 +207,21 @@ static inline int pruss_cfg_xfr_enable(struct udevice *dev, bool enable)
 			PRUSS_SPP_XFER_SHIFT_EN, set);
 }
 
+/**
+ * pruss_cfg_set_gpmux() - set the GPMUX value for a PRU device
+ * @pruss: pruss device
+ * @pru_id: PRU identifier (0-1)
+ * @mux: new mux value for PRU
+ */
+static inline int pruss_cfg_set_gpmux(struct udevice *dev,
+				      enum pruss_pru_id id, u8 mux)
+{
+	if (mux >= PRUSS_GP_MUX_SEL_MAX)
+		return -EINVAL;
+
+	return pruss_cfg_update(dev, PRUSS_CFG_GPCFG(id),
+			PRUSS_GPCFG_PRU_MUX_SEL_MASK,
+			(u32)mux << PRUSS_GPCFG_PRU_MUX_SEL_SHIFT);
+}
+
 #endif /* __TI_PRUSS_H */
