@@ -29,16 +29,6 @@
 /* ICSSG CORE_SYNC register bits */
 #define ICSSG_CORE_VBUSP_SYNC_EN		BIT(0)
 
-/**
- * enum pruss_mem - PRUSS memory range identifiers
- */
-enum pruss_mem {
-	PRUSS_MEM_DRAM0 = 0,
-	PRUSS_MEM_DRAM1,
-	PRUSS_MEM_SHRD_RAM2,
-	PRUSS_MEM_MAX,
-};
-
 /*
  * pruss_request_tm_region() - Request pruss for task manager region
  * @dev:	corresponding k3 device
@@ -51,32 +41,99 @@ int pruss_request_tm_region(struct udevice *dev, phys_addr_t *loc)
 	struct pruss *priv;
 
 	priv = dev_get_priv(dev);
-	if (!priv || !priv->pruss_dram0)
+	if (!priv || !priv->mem_regions[PRUSS_MEM_DRAM0].pa)
 		return -EINVAL;
 
-	*loc = priv->pruss_dram0 + ICSSG_TASK_MGR_OFFSET;
+	*loc = priv->mem_regions[PRUSS_MEM_DRAM0].pa + ICSSG_TASK_MGR_OFFSET;
+
+	return 0;
+}
+
+/**
+ * pruss_request_mem_region() - request a memory resource
+ * @dev: the pruss device
+ * @mem_id: the memory resource id
+ * @region: pointer to memory region structure to be filled in
+ *
+ * This function allows a client driver to request a memory resource,
+ * and if successful, will let the client driver own the particular
+ * memory region until released using the pruss_release_mem_region()
+ * API.
+ *
+ * Returns the memory region if requested resource is available, an
+ * error otherwise
+ */
+int pruss_request_mem_region(struct udevice *dev, enum pruss_mem mem_id,
+			     struct pruss_mem_region *region)
+{
+	struct pruss *pruss;
+
+	pruss = dev_get_priv(dev);
+	if (!pruss || !region)
+		return -EINVAL;
+
+	if (mem_id >= PRUSS_MEM_MAX)
+		return -EINVAL;
+
+	if (pruss->mem_in_use[mem_id])
+		return -EBUSY;
+
+	*region = pruss->mem_regions[mem_id];
+	pruss->mem_in_use[mem_id] = region;
+
+	return 0;
+}
+
+/**
+ * pruss_release_mem_region() - release a memory resource
+ * @dev: the pruss device
+ * @region: the memory region to release
+ *
+ * This function is the complimentary function to
+ * pruss_request_mem_region(), and allows the client drivers to
+ * release back a memory resource.
+ *
+ * Returns 0 on success, an error code otherwise
+ */
+int pruss_release_mem_region(struct udevice *dev,
+			     struct pruss_mem_region *region)
+{
+	int id;
+	struct pruss *pruss;
+
+	pruss = dev_get_priv(dev);
+	if (!pruss || !region)
+		return -EINVAL;
+
+	/* find out the memory region being released */
+	for (id = 0; id < PRUSS_MEM_MAX; id++) {
+		if (pruss->mem_in_use[id] == region)
+			break;
+	}
+
+	if (id == PRUSS_MEM_MAX)
+		return -EINVAL;
+
+	pruss->mem_in_use[id] = NULL;
 
 	return 0;
 }
 
 /*
  * pruss_request_shrmem_region() - Request pruss for shared memory region
- * @dev:	corresponding k3 device
- * @loc:	the shared memory physical address
- *
+ * @dev:       corresponding k3 device
+ * @loc:       the shared memory physical address
  * Return: 0 if all goes good, else appropriate error message.
  */
 int pruss_request_shrmem_region(struct udevice *dev, phys_addr_t *loc)
 {
-	struct pruss *priv;
+	struct pruss_mem_region region;
+	int ret;
 
-	priv = dev_get_priv(dev);
-	if (!priv || !priv->pruss_shrdram2)
-		return -EINVAL;
+	ret = pruss_request_mem_region(dev, PRUSS_MEM_SHRD_RAM2, &region);
+	*loc = region.pa;
 
-	*loc = priv->pruss_shrdram2;
-
-	return 0;
+	return ret;
 }
 
 /**
@@ -92,21 +149,20 @@ static int pruss_probe(struct udevice *dev)
 	ofnode sub_node, node, memories;
 	struct regmap *regmap_cfg;
 	struct udevice *syscon;
+	const char *mem_names[PRUSS_MEM_MAX] = { "dram0", "dram1", "shrdram2" };
+	int i;
 
 	priv = dev_get_priv(dev);
 	node = dev_ofnode(dev);
+	priv->dev = dev;
 	sub_node = ofnode_find_subnode(node, "cfg");
 	memories = ofnode_find_subnode(node, "memories");
 
-	idx = ofnode_stringlist_search(memories, "reg-names", "dram0");
-	priv->pruss_dram0 = ofnode_get_addr_size_index(memories, idx,
-						       (u64 *)&priv->pruss_dram0sz);
-	idx = ofnode_stringlist_search(memories, "reg-names", "dram1");
-	priv->pruss_dram1 = ofnode_get_addr_size_index(memories, idx,
-						       (u64 *)&priv->pruss_dram1sz);
-	idx = ofnode_stringlist_search(memories, "reg-names", "shrdram2");
-	priv->pruss_shrdram2 = ofnode_get_addr_size_index(memories, idx,
-							  (u64 *)&priv->pruss_shrdram2sz);
+	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
+		idx = ofnode_stringlist_search(memories, "reg-names", mem_names[i]);
+		priv->mem_regions[i].pa = ofnode_get_addr_size_index(memories, idx,
+						       (u64 *)&priv->mem_regions[i].size);
+	}
 
 	ret = uclass_get_device_by_ofnode(UCLASS_SYSCON, sub_node,
 					  &syscon);

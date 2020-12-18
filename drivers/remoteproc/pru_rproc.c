@@ -140,19 +140,20 @@ static void *pru_d_da_to_pa(struct pru_privdata *priv, u32 da, int len)
 	if (len <= 0)
 		return NULL;
 
-	dram0 = priv->prusspriv->pruss_dram0;
-	dram1 = priv->prusspriv->pruss_dram1;
-	shrdram2 = priv->prusspriv->pruss_shrdram2;
-	dram0sz = priv->prusspriv->pruss_dram0sz;
-	dram1sz = priv->prusspriv->pruss_dram1sz;
-	shrdram2sz = priv->prusspriv->pruss_shrdram2sz;
+	dram0 = priv->prusspriv->mem_regions[PRUSS_MEM_DRAM0].pa;
+	dram1 = priv->prusspriv->mem_regions[PRUSS_MEM_DRAM1].pa;
+	shrdram2 = priv->prusspriv->mem_regions[PRUSS_MEM_SHRD_RAM2].pa;
+	dram0sz = priv->prusspriv->mem_regions[PRUSS_MEM_DRAM0].size;
+	dram1sz = priv->prusspriv->mem_regions[PRUSS_MEM_DRAM1].size;
+	shrdram2sz = priv->prusspriv->mem_regions[PRUSS_MEM_SHRD_RAM2].size;
 
 	/* PRU1 has its local RAM addresses reversed */
 	if (priv->id == 1) {
-		dram1 = priv->prusspriv->pruss_dram0;
-		dram0 = priv->prusspriv->pruss_dram1;
-		dram1sz = priv->prusspriv->pruss_dram0sz;
-		dram0sz = priv->prusspriv->pruss_dram1sz;
+		dram1 = dram0;
+		dram1sz = dram0sz;
+
+		dram0 =  priv->prusspriv->mem_regions[PRUSS_MEM_DRAM1].pa;
+		dram0sz = priv->prusspriv->mem_regions[PRUSS_MEM_DRAM1].size;
 	}
 
 	if (da >= priv->pdram_da && da + len <= priv->pdram_da + dram0sz) {
