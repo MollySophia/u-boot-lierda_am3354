@@ -71,6 +71,58 @@ struct pru_privdata {
 	struct pruss *prusspriv;
 };
 
+static inline u32 pru_control_read_reg(struct pru_privdata *pru, unsigned int reg)
+{
+	return readl(pru->pru_ctrl + reg);
+}
+
+static inline
+void pru_control_write_reg(struct pru_privdata *pru, unsigned int reg, u32 val)
+{
+	writel(val, pru->pru_ctrl + reg);
+}
+
+static inline
+void pru_control_set_reg(struct pru_privdata *pru, unsigned int reg,
+			 u32 mask, u32 set)
+{
+	u32 val;
+
+	val = pru_control_read_reg(pru, reg);
+	val &= ~mask;
+	val |= (set & mask);
+	pru_control_write_reg(pru, reg, val);
+}
+
+/**
+ * pru_rproc_set_ctable() - set the constant table index for the PRU
+ * @rproc: the rproc instance of the PRU
+ * @c: constant table index to set
+ * @addr: physical address to set it to
+ */
+static int pru_rproc_set_ctable(struct pru_privdata *pru, enum pru_ctable_idx c, u32 addr)
+{
+	unsigned int reg;
+	u32 mask, set;
+	u16 idx;
+	u16 idx_mask;
+
+	/* pointer is 16 bit and index is 8-bit so mask out the rest */
+	idx_mask = (c >= PRU_C28) ? 0xFFFF : 0xFF;
+
+	/* ctable uses bit 8 and upwards only */
+	idx = (addr >> 8) & idx_mask;
+
+	/* configurable ctable (i.e. C24) starts at PRU_CTRL_CTBIR0 */
+	reg = PRU_CTRL_CTBIR0 + 4 * (c >> 1);
+	mask = idx_mask << (16 * (c & 1));
+	set = idx << (16 * (c & 1));
+
+	pru_control_set_reg(pru, reg, mask, set);
+
+	return 0;
+}
+
 /**
  * pru_start() - start the pru processor
  * @dev:	corresponding k3 remote processor device
@@ -83,6 +135,8 @@ static int pru_start(struct udevice *dev)
 	int val = 0;
 
 	priv = dev_get_priv(dev);
+
+	pru_rproc_set_ctable(priv, PRU_C28, 0x100 << 8);
 
 	val = CTRL_CTRL_EN | ((priv->bootaddr >> 2) << 16);
 	writel(val, priv->pru_ctrl + PRU_CTRL_CTRL);

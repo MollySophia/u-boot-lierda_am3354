@@ -4,6 +4,20 @@
 #define __TI_PRUSS_H
 
 /**
+ * enum pru_ctable_idx - Configurable Constant table index identifiers
+ */
+enum pru_ctable_idx {
+	PRU_C24 = 0,
+	PRU_C25,
+	PRU_C26,
+	PRU_C27,
+	PRU_C28,
+	PRU_C29,
+	PRU_C30,
+	PRU_C31,
+};
+
+/**
  * enum pruss_mem - PRUSS memory range identifiers
  */
 enum pruss_mem {
