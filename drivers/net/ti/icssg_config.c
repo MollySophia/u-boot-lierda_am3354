@@ -69,7 +69,7 @@ void icssg_config_sr1(struct prueth *prueth)
 	int i, index;
 	int slice = prueth->slice;
 
-	va = (void __iomem *)prueth->pruss_shrdram2 + slice * ICSSG_CONFIG_OFFSET_SLICE1;
+	va = (void __iomem *)prueth->shram.pa + slice * ICSSG_CONFIG_OFFSET_SLICE1;
 	config = &prueth->config[slice];
 	memset(config, 0, sizeof(*config));
 	config->addr_lo = cpu_to_le32(lower_32_bits(prueth->sram_pa));

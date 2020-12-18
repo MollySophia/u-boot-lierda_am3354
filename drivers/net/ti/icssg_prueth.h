@@ -18,6 +18,7 @@
 #include <dm/device.h>
 #include <dma-uclass.h>
 #include <regmap.h>
+#include <ti-pruss.h>
 #include "icssg_config.h"
 
 void icssg_class_set_mac_addr(struct regmap *miig_rt, int slice, u8 *mac);
@@ -51,7 +52,7 @@ struct prueth {
 	struct regmap		*miig_rt;
 	struct regmap		*mii_rt;
 	fdt_addr_t		mdio_base;
-	phys_addr_t		pruss_shrdram2;
+	struct pruss_mem_region shram;
 	phys_addr_t		tmaddr;
 	struct mii_dev		*bus;
 	u32			port_id;

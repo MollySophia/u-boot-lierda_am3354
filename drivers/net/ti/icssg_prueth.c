@@ -510,7 +510,8 @@ static int prueth_probe(struct udevice *dev)
 	if (ret)
 		dev_err(dev, "error getting the pruss dev\n");
 
-	ret = pruss_request_shrmem_region(*prussdev, &prueth->pruss_shrdram2);
+	ret = pruss_request_mem_region(*prussdev, PRUSS_MEM_SHRD_RAM2,
+				       &prueth->shram);
 	if (ret)
 		return ret;
 
