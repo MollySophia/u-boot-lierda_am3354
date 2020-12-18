@@ -8,6 +8,16 @@
 #ifndef __NET_TI_ICSSG_CONFIG_H
 #define __NET_TI_ICSSG_CONFIG_H
 
+struct icssg_buffer_pool_cfg {
+	__le32  addr;
+	__le32  len;
+} __packed;
+
+struct icssg_flow_cfg {
+	__le16 rx_base_flow;
+	__le16 mgm_base_flow;
+} __packed;
+
 /*------------------------ SR1.0 related --------------------------*/
 
 /* Port queue size in MSMC from firmware
@@ -82,5 +92,125 @@ struct icssg_config_sr1 {
  */
 #define ICSSG_RX_CHAN_FLOW_ID		0 /* flow id for host port */
 #define ICSSG_RX_MGM_CHAN_FLOW_ID	1 /* flow id for command response */
+
+/*------------------------ SR2.0 related --------------------------*/
+
+#define PRUETH_PKT_TYPE_CMD	0x10
+#define PRUETH_NAV_PS_DATA_SIZE	16	/* Protocol specific data size */
+#define PRUETH_NAV_SW_DATA_SIZE	16	/* SW related data size */
+#define PRUETH_MAX_RX_FLOWS_SR2	1	/* excluding default flow */
+#define PRUETH_RX_FLOW_DATA_SR2	0	/* FIXME: f/w bug to change to highest priority flow */
+
+#define PRUETH_EMAC_BUF_POOL_SIZE_SR2	SZ_8K
+#define PRUETH_EMAC_POOLS_PER_SLICE	24
+#define PRUETH_EMAC_BUF_POOL_START_SR2	8
+#define PRUETH_NUM_BUF_POOLS_SR2	8
+#define PRUETH_EMAC_RX_CTX_BUF_SIZE	SZ_16K	/* per slice */
+#define MSMC_RAM_SIZE_SR2	(2 * (PRUETH_EMAC_BUF_POOL_SIZE_SR2 * PRUETH_NUM_BUF_POOLS_SR2 + PRUETH_EMAC_RX_CTX_BUF_SIZE))
+
+struct icssg_rxq_ctx {
+	__le32 start[3];
+	__le32 end;
+} __packed;
+
+/* Load time Fiwmware Configuration */
+
+#define ICSSG_FW_MGMT_CMD_HEADER	0x81
+#define ICSSG_FW_MGMT_FDB_CMD_TYPE	0x03
+#define ICSSG_FW_MGMT_CMD_TYPE		0x04
+#define ICSSG_FW_MGMT_PKT		0x80000000
+
+struct icssg_r30_cmd {
+	u32 cmd[4];
+} __packed;
+
+enum icssg_port_state_cmd {
+	ICSSG_EMAC_PORT_DISABLE = 0,
+	ICSSG_EMAC_PORT_BLOCK,
+	ICSSG_EMAC_PORT_FORWARD,
+	ICSSG_EMAC_PORT_FORWARD_WO_LEARNING,
+	ICSSG_EMAC_PORT_ACCEPT_ALL,
+	ICSSG_EMAC_PORT_ACCEPT_TAGGED,
+	ICSSG_EMAC_PORT_ACCEPT_UNTAGGED_N_PRIO,
+	ICSSG_EMAC_PORT_TAS_TRIGGER,
+	ICSSG_EMAC_PORT_TAS_ENABLE,
+	ICSSG_EMAC_PORT_TAS_RESET,
+	ICSSG_EMAC_PORT_TAS_DISABLE,
+	ICSSG_EMAC_PORT_UC_FLOODING_ENABLE,
+	ICSSG_EMAC_PORT_UC_FLOODING_DISABLE,
+	ICSSG_EMAC_PORT_MC_FLOODING_ENABLE,
+	ICSSG_EMAC_PORT_MC_FLOODING_DISABLE,
+	ICSSG_EMAC_PORT_PREMPT_TX_ENABLE,
+	ICSSG_EMAC_PORT_PREMPT_TX_DISABLE,
+	ICSSG_EMAC_PORT_MAX_COMMANDS
+};
+
+#define EMAC_NONE           0xffff0000
+#define EMAC_PRU0_P_DI      0xffff0004
+#define EMAC_PRU1_P_DI      0xffff0040
+#define EMAC_TX_P_DI        0xffff0100
+
+#define EMAC_PRU0_P_EN      0xfffb0000
+#define EMAC_PRU1_P_EN      0xffbf0000
+#define EMAC_TX_P_EN        0xfeff0000
+
+#define EMAC_P_BLOCK        0xffff0040
+#define EMAC_TX_P_BLOCK     0xffff0200
+#define EMAC_P_UNBLOCK      0xffbf0000
+#define EMAC_TX_P_UNBLOCK   0xfdff0000
+#define EMAC_LEAN_EN        0xfff70000
+#define EMAC_LEAN_DI        0xffff0008
+
+#define EMAC_ACCEPT_ALL     0xffff0001
+#define EMAC_ACCEPT_TAG     0xfffe0002
+#define EMAC_ACCEPT_PRIOR   0xfffc0000
+
+/* Config area lies in DRAM */
+#define ICSSG_CONFIG_OFFSET			0x0
+
+#define ICSSG_NUM_NORMAL_PDS	64
+#define ICSSG_NUM_SPECIAL_PDS	16
+
+#define ICSSG_NORMAL_PD_SIZE	8
+#define ICSSG_SPECIAL_PD_SIZE	20
+
+#define ICSSG_FLAG_MASK		0xff00ffff
+
+struct icssg_setclock_desc {
+	u8 request;
+	u8 restore;
+	u8 acknowledgment;
+	u8 cmp_status;
+	u32 margin;
+	u32 cyclecounter0_set;
+	u32 cyclecounter1_set;
+	u32 iepcount_set;
+	u32 rsvd1;
+	u32 rsvd2;
+	u32 CMP0_current;
+	u32 iepcount_current;
+	u32 difference;
+	u32 cyclecounter0_new;
+	u32 cyclecounter1_new;
+	u32 CMP0_new;
+} __packed;
+
+#define ICSSG_CMD_POP_SLICE0	56
+#define ICSSG_CMD_POP_SLICE1	60
+
+#define ICSSG_CMD_PUSH_SLICE0	57
+#define ICSSG_CMD_PUSH_SLICE1	61
+
+#define ICSSG_RSP_POP_SLICE0	58
+#define ICSSG_RSP_POP_SLICE1	62
+
+#define ICSSG_RSP_PUSH_SLICE0	56
+#define ICSSG_RSP_PUSH_SLICE1	60
+
+#define ICSSG_TS_POP_SLICE0	59
+#define ICSSG_TS_POP_SLICE1	63
+
+#define ICSSG_TS_PUSH_SLICE0	40
+#define ICSSG_TS_PUSH_SLICE1	41
 
 #endif /* __NET_TI_ICSSG_CONFIG_H */

@@ -40,10 +40,12 @@ enum prueth_port {
 
 struct prueth {
 	struct udevice		*dev;
+	struct udevice		*pruss;
 	struct regmap		*miig_rt;
 	struct regmap		*mii_rt;
 	fdt_addr_t		mdio_base;
 	struct pruss_mem_region shram;
+	struct pruss_mem_region dram;
 	phys_addr_t		tmaddr;
 	struct mii_dev		*bus;
 	u32			port_id;
@@ -69,5 +71,6 @@ struct prueth {
 /* config helpers */
 void icssg_config_ipg(struct prueth *prueth, int speed, int mii);
 void icssg_config_sr1(struct prueth *prueth);
+int icssg_config_sr2(struct prueth *prueth);
 
 #endif /* __NET_TI_ICSSG_PRUETH_H */

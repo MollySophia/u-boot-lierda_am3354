@@ -509,6 +509,7 @@ static int prueth_probe(struct udevice *dev)
 	ret = device_find_global_by_ofnode(pruss_node, prussdev);
 	if (ret)
 		dev_err(dev, "error getting the pruss dev\n");
+	prueth->pruss = *prussdev;
 
 	ret = pruss_request_mem_region(*prussdev, PRUSS_MEM_SHRD_RAM2,
 				       &prueth->shram);
@@ -550,6 +551,14 @@ static int prueth_probe(struct udevice *dev)
 		prueth->eth_node[PRUETH_MAC0] = eth1_node;
 	}
 
+	ret = pruss_request_mem_region(*prussdev,
+				       prueth->slice ? PRUSS_MEM_DRAM1 : PRUSS_MEM_DRAM0,
+				       &prueth->dram);
+	if (ret) {
+		dev_err(dev, "could not request DRAM%d region\n", prueth->slice);
+		return ret;
+	}
+
 	prueth->miig_rt = syscon_regmap_lookup_by_phandle(dev, "mii-g-rt");
 	if (!prueth->miig_rt) {
 		dev_err(dev, "couldn't get mii-g-rt syscon regmap\n");
@@ -584,6 +593,11 @@ static int prueth_probe(struct udevice *dev)
 		return -EINVAL;
 
 	prueth->sram_pa = ofnode_get_addr(sram_node);
+	if (prueth->sram_pa % SZ_64K != 0) {
+		/* This is constraint for SR2.0 firmware */
+		dev_err(dev, "sram address needs to be 64KB aligned\n");
+		return -EINVAL;
+	}
 
 	if (!prueth->slice) {
 		ret = prueth_config_rgmiidelay(prueth, eth0_node);
@@ -616,6 +630,8 @@ static int prueth_probe(struct udevice *dev)
 	/* Set Load time configuration */
 	if (prueth->is_sr1)
 		icssg_config_sr1(prueth);
+	else
+		icssg_config_sr2(prueth);
 
 	return 0;
 out:
