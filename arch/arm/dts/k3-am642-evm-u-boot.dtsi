@@ -70,6 +70,10 @@
 	u-boot,dm-spl;
 };
 
+&main_mmc1_pins_default {
+	u-boot,dm-spl;
+};
+
 &cpsw3g {
 	reg = <0x0 0x8000000 0x0 0x200000>,
 	      <0x0 0x43000200 0x0 0x8>;
