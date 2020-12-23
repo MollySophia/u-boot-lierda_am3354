@@ -279,8 +279,16 @@
 		clocks = <&k3_clks 57 0>, <&k3_clks 57 1>;
 		clock-names = "clk_ahb", "clk_xin";
 		interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-		ti,otap-del-sel-legacy = <0x0>;
 		ti,trm-icp = <0x2>;
+		bus-width = <8>;
+		mmc-ddr-1_8v;
+		mmc-hs200-1_8v;
+		mmc-hs400-1_8v;
+		ti,otap-del-sel-legacy = <0x0>;
+		ti,otap-del-sel-mmc-hs = <0x0>;
+		ti,otap-del-sel-ddr52 = <0x6>;
+		ti,otap-del-sel-hs200 = <0x7>;
+		ti,otap-del-sel-hs400 = <0x4>;
 	};
 
 	main_sdhci1: sdhci@fa00000 {
@@ -290,8 +298,9 @@
 		clocks = <&k3_clks 58 3>, <&k3_clks 58 4>;
 		clock-names = "clk_ahb", "clk_xin";
 		interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
-		ti,otap-del-sel-legacy = <0x0>;
 		ti,trm-icp = <0x2>;
+		ti,otap-del-sel-legacy = <0x0>;
+		ti,otap-del-sel-sd-hs = <0xf>;
 	};
 
 	main_gpio0: gpio@600000 {
