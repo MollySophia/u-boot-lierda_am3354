@@ -31,6 +31,7 @@
 
 &sdhci1{
 	max-frequency = <25000000>;
+	no-1-8-v;
 	ti,otap-del-sel-sdr12 = <0x0>;
 	ti,otap-del-sel-sdr25 = <0x0>;
 };
