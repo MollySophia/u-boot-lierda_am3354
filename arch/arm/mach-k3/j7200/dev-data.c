@@ -2,7 +2,7 @@
 /*
  * J7200 specific device platform data
  *
- * Copyright (C) 2020 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2020-2021 Texas Instruments Incorporated - http://www.ti.com/
  */
 #include "k3-dev.h"
 
