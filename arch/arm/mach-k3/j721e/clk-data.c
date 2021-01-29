@@ -150,6 +150,16 @@ static const char * const main_pll_hfosc_sel_out8_parents[] = {
 	"board_0_hfosc1_clk_out",
 };
 
+static const char * const usb0_refclk_sel_out0_parents[] = {
+	"gluelogic_hfosc0_clkout",
+	"board_0_hfosc1_clk_out",
+};
+
+static const char * const usb1_refclk_sel_out0_parents[] = {
+	"gluelogic_hfosc0_clkout",
+	"board_0_hfosc1_clk_out",
+};
+
 static const char * const wkup_obsclk_mux_out0_parents[] = {
 	"j7_wakeup_16ff_wkup_0_wkup_rcosc_12p5m_clk",
 	NULL,
@@ -486,6 +496,8 @@ static const struct clk_data clk_list[] = {
 	CLK_MUX("main_pll_hfosc_sel_out6", main_pll_hfosc_sel_out6_parents, 2, 0x43008098, 0, 1, 0),
 	CLK_MUX("main_pll_hfosc_sel_out7", main_pll_hfosc_sel_out7_parents, 2, 0x4300809c, 0, 1, 0),
 	CLK_MUX("main_pll_hfosc_sel_out8", main_pll_hfosc_sel_out8_parents, 2, 0x430080a0, 0, 1, 0),
+	CLK_MUX("usb0_refclk_sel_out0", usb0_refclk_sel_out0_parents, 2, 0x1080e0, 0, 1, 0),
+	CLK_MUX("usb1_refclk_sel_out0", usb1_refclk_sel_out0_parents, 2, 0x1080e4, 0, 1, 0),
 	CLK_FIXED_RATE("board_0_audio_ext_refclk0_out", 0, 0),
 	CLK_FIXED_RATE("board_0_audio_ext_refclk1_out", 0, 0),
 	CLK_FIXED_RATE("board_0_audio_ext_refclk2_out", 0, 0),
@@ -527,6 +539,7 @@ static const struct clk_data clk_list[] = {
 	CLK_PLL("pllfrac2_ssmod_16fft_main_8_foutvcop_clk", "main_pll_hfosc_sel_out8", 0x688000, 0),
 	CLK_PLL("pllfracf_ssmod_16fft_main_12_foutvcop_clk", "main_pll_hfosc_sel_out12", 0x68c000, 0),
 	CLK_DIV("postdiv3_16fft_main_0_hsdivout6_clk", "pllfrac2_ssmod_16fft_main_0_foutpostdiv_clk", 0x680098, 0, 7, 0),
+	CLK_DIV("postdiv3_16fft_main_1_hsdivout7_clk", "pllfrac2_ssmod_16fft_main_1_foutpostdiv_clk", 0x68109c, 0, 7, 0),
 	CLK_MUX("wkup_obsclk_mux_out0", wkup_obsclk_mux_out0_parents, 16, 0x43008000, 0, 4, 0),
 	CLK_MUX("main_pll15_xref_sel_out0", main_pll15_xref_sel_out0_parents, 2, 0x430080bc, 4, 1, 0),
 	CLK_MUX("main_pll24_hfosc_sel_out0", main_pll24_hfosc_sel_out0_parents, 2, 0x430080e0, 0, 1, 0),
@@ -732,11 +745,27 @@ static const struct dev_clk soc_dev_clk_data[] = {
 	DEV_CLK(197, 2, "gluelogic_hfosc0_clkout"),
 	DEV_CLK(202, 2, "hsdiv0_16fft_main_8_hsdivout0_clk"),
 	DEV_CLK(203, 0, "hsdiv0_16fft_main_8_hsdivout0_clk"),
+	DEV_CLK(288, 19, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(288, 4, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(288, 3, "postdiv3_16fft_main_1_hsdivout7_clk"),
+	DEV_CLK(288, 18, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(288, 5, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(288, 15, "usb0_refclk_sel_out0"),
+	DEV_CLK(288, 16, "gluelogic_hfosc0_clkout"),
+	DEV_CLK(288, 17, "board_0_hfosc1_clk_out"),
+	DEV_CLK(289, 19, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(289, 4, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(289, 3, "postdiv3_16fft_main_1_hsdivout7_clk"),
+	DEV_CLK(289, 18, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(289, 5, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
+	DEV_CLK(289, 15, "usb1_refclk_sel_out0"),
+	DEV_CLK(289, 16, "gluelogic_hfosc0_clkout"),
+	DEV_CLK(289, 17, "board_0_hfosc1_clk_out"),
 };
 
 const struct ti_k3_clk_platdata j721e_clk_platdata = {
 	.clk_list = clk_list,
-	.clk_list_cnt = 151,
+	.clk_list_cnt = 154,
 	.soc_dev_clk_data = soc_dev_clk_data,
-	.soc_dev_clk_data_cnt = 147,
+	.soc_dev_clk_data_cnt = 163,
 };
