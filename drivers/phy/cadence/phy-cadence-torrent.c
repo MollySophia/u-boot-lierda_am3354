@@ -632,7 +632,7 @@ static int cdns_torrent_phy_probe(struct udevice *dev)
 	int ret, subnodes = 0, node = 0, i;
 	ofnode child;
 	u32 total_num_lanes = 0;
-	u32 phy_type;
+	u32 phy_type, val;
 
 	cdns_phy->dev = dev;
 
@@ -669,6 +669,12 @@ static int cdns_torrent_phy_probe(struct udevice *dev)
 	ret = cdns_torrent_regfield_init(cdns_phy);
 	if (ret)
 		return ret;
+
+	regmap_field_read(cdns_phy->phy_pma_cmn_ctrl_1, &val);
+	if (val) {
+		dev_err(dev, "SERDES already configured\n");
+		return -EBUSY;
+	}
 
 	/* Enable APB */
 	reset_control_deassert(cdns_phy->apb_rst);
@@ -1272,7 +1278,6 @@ static struct cdns_reg_pairs sgmii_100_no_ssc_rx_ln_regs[] = {
 	{0x0010, RX_DIAG_PI_RATE},
 	{0x0001, RX_DIAG_ACYA},
 	{0x018C, RX_CDRLF_CNFG},
-	{0x4000, XCVR_DIAG_RXCLK_CTRL},
 };
 
 static struct cdns_torrent_vals sgmii_100_no_ssc_cmn_vals = {
