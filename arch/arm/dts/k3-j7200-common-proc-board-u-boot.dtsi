@@ -208,3 +208,15 @@
 &main_esm {
 	u-boot,dm-spl;
 };
+
+&serdes_ln_ctrl {
+	u-boot,mux-autoprobe;
+};
+
+&usb_serdes_mux {
+	u-boot,mux-autoprobe;
+};
+
+&serdes0 {
+	u-boot,dm-spl;
+};
