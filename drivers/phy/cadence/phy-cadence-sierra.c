@@ -532,7 +532,7 @@ static int cdns_sierra_phy_probe(struct udevice *dev)
 		return PTR_ERR(sp->apb_rst);
 	}
 
-	clk = devm_clk_get_optional(dev, "cmn_refclk");
+	clk = devm_clk_get_optional(dev, "cmn_refclk_dig_div");
 	if (IS_ERR(clk)) {
 		dev_err(dev, "cmn_refclk clock not found\n");
 		ret = PTR_ERR(clk);
@@ -540,7 +540,7 @@ static int cdns_sierra_phy_probe(struct udevice *dev)
 	}
 	sp->cmn_refclk = clk;
 
-	clk = devm_clk_get_optional(dev, "cmn_refclk1");
+	clk = devm_clk_get_optional(dev, "cmn_refclk1_dig_div");
 	if (IS_ERR(clk)) {
 		dev_err(dev, "cmn_refclk1 clock not found\n");
 		ret = PTR_ERR(clk);
