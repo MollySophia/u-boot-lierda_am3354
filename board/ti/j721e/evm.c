@@ -29,7 +29,8 @@
 #define board_is_j721e_pm1_som()	board_ti_k3_is("J721EX-PM1-SOM")
 #define board_is_j721e_pm2_som()	board_ti_k3_is("J721EX-PM2-SOM")
 
-#define board_is_j7200_som()	board_ti_k3_is("J7200X-PM1-SOM")
+#define board_is_j7200_som()	(board_ti_k3_is("J7200X-PM1-SOM") || \
+				 board_ti_k3_is("J7200X-PM2-SOM"))
 
 /* Max number of MAC addresses that are parsed/processed per daughter card */
 #define DAUGHTER_CARD_NO_OF_MAC_ADDR	8
@@ -412,6 +413,33 @@ void configure_serdes(void)
 	generic_phy_power_on(&serdes);
 }
 #endif
+
+#if defined(CONFIG_PHY_CADENCE_TORRENT) || defined(CONFIG_SPL_PHY_CADENCE_TORRENT)
+void configure_serdes_torrent(void)
+{
+	struct udevice *dev;
+	struct phy serdes;
+	int ret;
+
+	ret = uclass_get_device_by_driver(UCLASS_PHY,
+					  DM_GET_DRIVER(torrent_phy_provider),
+					  &dev);
+	if (ret)
+		printf("Torrent init failed:%d\n", ret);
+
+	serdes.dev = dev;
+	serdes.id = 0;
+
+	ret = generic_phy_init(&serdes);
+	if (ret)
+		printf("phy_init failed!!\n");
+
+	ret = generic_phy_power_on(&serdes);
+	if (ret)
+		printf("phy_power_on failed !!\n");
+}
+#endif
+
 int board_late_init(void)
 {
 	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
@@ -421,6 +449,11 @@ int board_late_init(void)
 		/* Check for and probe any plugged-in daughtercards */
 		probe_daughtercards();
 	}
+
+#if defined(CONFIG_PHY_CADENCE_TORRENT) || defined(CONFIG_SPL_PHY_CADENCE_TORRENT)
+	if (board_is_j7200_som())
+		configure_serdes_torrent();
+#endif
 
 	return 0;
 }
