@@ -65,6 +65,12 @@ struct driver_info;
 #define DM_FLAG_DEFAULT_PD_CTRL_OFF	(1 << 11)
 
 /*
+ * Device is removed without switching off its power domain. This might
+ * be required, i. e. for serial console (debug) output when booting OS.
+ */
+#define DM_FLAG_REMOVE_WITH_PD_ON	(1 << 13)
+
+/*
  * One or multiple of these flags are passed to device_remove() so that
  * a selective device removal as specified by the remove-stage and the
  * driver flags can be done.
