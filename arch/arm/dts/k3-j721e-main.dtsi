@@ -117,7 +117,7 @@
 	};
 
 	serdes_wiz3: wiz@5030000 {
-		compatible = "ti,j721e-wiz";
+		compatible = "ti,j721e-wiz-16g";
 		#address-cells = <2>;
 		#size-cells = <2>;
 		power-domains = <&k3_pds 295 TI_SCI_PD_EXCLUSIVE>;
@@ -129,7 +129,7 @@
 		#reset-cells = <1>;
 		ranges;
 
-		wiz3_pll0_refclk: pll0_refclk {
+		wiz3_pll0_refclk: pll0-refclk {
 			clocks = <&k3_clks 295 9>, <&dummy_cmn_refclk>;
 			clock-output-names = "wiz3_pll0_refclk";
 			#clock-cells = <0>;
@@ -137,7 +137,7 @@
 			assigned-clock-parents = <&k3_clks 295 9>;
 		};
 
-		wiz3_pll1_refclk: pll1_refclk {
+		wiz3_pll1_refclk: pll1-refclk {
 			clocks = <&k3_clks 295 0>, <&dummy_cmn_refclk1>;
 			clock-output-names = "wiz3_pll1_refclk";
 			#clock-cells = <0>;
@@ -145,7 +145,7 @@
 			assigned-clock-parents = <&k3_clks 295 0>;
 		};
 
-		wiz3_refclk_dig: refclk_dig {
+		wiz3_refclk_dig: refclk-dig {
 			clocks = <&k3_clks 295 9>, <&k3_clks 295 0>, <&dummy_cmn_refclk>, <&dummy_cmn_refclk1>;
 			clock-output-names = "wiz3_refclk_dig";
 			#clock-cells = <0>;
@@ -153,15 +153,13 @@
 			assigned-clock-parents = <&k3_clks 295 9>;
 		};
 
-		wiz3_cmn_refclk: cmn_refclk {
+		wiz3_cmn_refclk_dig_div: cmn-refclk-dig-div {
 			clocks = <&wiz3_refclk_dig>;
-			clock-output-names = "wiz3_cmn_refclk";
 			#clock-cells = <0>;
 		};
 
-		wiz3_cmn_refclk1: cmn_refclk1 {
+		wiz3_cmn_refclk1_dig_div: cmn-refclk1-dig-div {
 			clocks = <&wiz3_pll1_refclk>;
-			clock-output-names = "wiz3_cmn_refclk1";
 			#clock-cells = <0>;
 		};
 
@@ -173,8 +171,8 @@
 			#size-cells = <0>;
 			resets = <&serdes_wiz3 0>;
 			reset-names = "sierra_reset";
-			clocks = <&wiz3_cmn_refclk>, <&wiz3_cmn_refclk1>;
-			clock-names = "cmn_refclk", "cmn_refclk1";
+			clocks = <&wiz3_cmn_refclk_dig_div>, <&wiz3_cmn_refclk1_dig_div>;
+			clock-names = "cmn_refclk_dig_div", "cmn_refclk1_dig_div";
 		};
 	};
 
