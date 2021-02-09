@@ -222,7 +222,7 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 	ulong child_rate;
 	const struct clk_ops *ops;
 	ulong new_rate;
-	ulong diff;
+	ulong diff, new_diff;
 
 	/*
 	 * We must propagate rate change to parent if current clock type
@@ -239,8 +239,11 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 		 */
 		child_rate = clk_get_rate(clkp);
 		clkp = clk_get_parent(clkp);
-		if (clkp)
+		if (clkp) {
+			debug("%s: propagating rate change to parent %s, rate=%u.\n",
+			      __func__, clkp->dev->name, (u32)rate / div);
 			div *= clk_get_rate(clkp) / child_rate;
+		}
 	}
 
 	if (!clkp)
@@ -251,9 +254,9 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 	new_rate = clk_set_rate(clkp, rate / div);
 
 	/*
-	 * If the new rate differs by at least 10% of the target,
-	 * modify parent. This handles typical cases where we have a hsdiv
-	 * following directly a PLL
+	 * If the new rate differs by at least 5% of the target,
+	 * we must check for rounding error in a divider, so try
+	 * set rate with rate + 1.
 	 */
 
 	diff = abs(new_rate - rate / div);
@@ -261,7 +264,21 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 	debug("%s: clk=%s, div=%d, rate=%u, new_rate=%u, diff=%u\n", __func__,
 	      clkp->dev->name, div, (u32)rate, (u32)new_rate, (u32)diff);
 
-	if (diff > rate / div / 10) {
+	if (diff > rate / div / 20) {
+		new_rate = clk_set_rate(clkp, (rate / div) + 1);
+		new_diff = abs(new_rate - rate / div);
+
+		if (new_diff > diff)
+			new_rate = clk_set_rate(clkp, rate / div);
+	}
+
+	/*
+	 * If the new rate differs by 50% of the target,
+	 * modify parent. This handles typical cases where we have a hsdiv
+	 * following directly a PLL
+	 */
+
+	if (diff > rate / div / 2) {
 		ulong pll_tgt;
 		int pll_div;
 
