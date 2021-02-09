@@ -37,6 +37,7 @@ static struct ti_lpsc soc_lpsc_list[] = {
 	[13] = PSC_LPSC(3, &soc_psc_list[1], &soc_pd_list[5], NULL),
 	[14] = PSC_LPSC(10, &soc_psc_list[1], &soc_pd_list[5], NULL),
 	[15] = PSC_LPSC(11, &soc_psc_list[1], &soc_pd_list[5], NULL),
+	[16] = PSC_LPSC(12, &soc_psc_list[1], &soc_pd_list[5], NULL),
 };
 
 static struct ti_dev soc_dev_list[] = {
@@ -52,6 +53,7 @@ static struct ti_dev soc_dev_list[] = {
 	PSC_DEV(4, &soc_lpsc_list[9]),
 	PSC_DEV(202, &soc_lpsc_list[10]),
 	PSC_DEV(203, &soc_lpsc_list[11]),
+	PSC_DEV(102, &soc_lpsc_list[12]),
 	PSC_DEV(103, &soc_lpsc_list[12]),
 	PSC_DEV(104, &soc_lpsc_list[12]),
 	PSC_DEV(154, &soc_lpsc_list[12]),
@@ -59,6 +61,7 @@ static struct ti_dev soc_dev_list[] = {
 	PSC_DEV(197, &soc_lpsc_list[13]),
 	PSC_DEV(103, &soc_lpsc_list[14]),
 	PSC_DEV(104, &soc_lpsc_list[15]),
+	PSC_DEV(102, &soc_lpsc_list[16]),
 };
 
 const struct ti_k3_pd_platdata j7200_pd_platdata = {
@@ -68,6 +71,6 @@ const struct ti_k3_pd_platdata j7200_pd_platdata = {
 	.devs = soc_dev_list,
 	.num_psc = 2,
 	.num_pd = 6,
-	.num_lpsc = 16,
-	.num_devs = 19,
+	.num_lpsc = 17,
+	.num_devs = 21,
 };
