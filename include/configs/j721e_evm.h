@@ -51,6 +51,25 @@
 /* Image load address in RAM for DFU boot*/
 #endif
 
+#if defined(CONFIG_TARGET_J721E_R5_EVM)
+/*
+ * The dfu buffer is allocated for downloading sysfw.itb.
+ * This limits the allocation to MCU L3 RAM as DRAM is initialized later.
+ * The total heap memory available is 0x70000 bytes. So, reduce
+ * the buffer size to avoid NOMEM error.
+ */
+#define CONFIG_SYS_DFU_DATA_BUF_SIZE    0x5000
+#else
+/* Set default dfu buffer size to 256KB (sector size of OSPI) */
+#define CONFIG_SYS_DFU_DATA_BUF_SIZE    0x40000
+#endif
+
+/*
+ * If the maximum size is not declared then it is defined as
+ * CONFIG_SYS_DFU_DATA_BUF_SIZE.
+ */
+#define CONFIG_SYS_DFU_MAX_FILE_SIZE   (1024 * 1024 * 8)   /* 8 MiB */
+
 #ifdef CONFIG_SYS_K3_SPL_ATF
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"tispl.bin"
 #endif
@@ -156,9 +175,7 @@
 #define EXTRA_ENV_CONFIG_MAIN_CPSW0_QSGMII_PHY
 #endif
 
-/* set default dfu_bufsiz to 128KB (sector size of OSPI) */
 #define EXTRA_ENV_DFUARGS \
-	"dfu_bufsiz=0x40000\0" \
 	DFU_ALT_INFO_MMC \
 	DFU_ALT_INFO_EMMC \
 	DFU_ALT_INFO_RAM \
