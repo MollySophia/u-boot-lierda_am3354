@@ -665,6 +665,7 @@ static const struct dev_clk soc_dev_clk_data[] = {
 	DEV_CLK(104, 6, "fss_mcu_0_ospi_1_ospi_oclk_clk"),
 	DEV_CLK(104, 7, "k3_pll_ctrl_wrap_wkup_0_chip_div1_clk_clk"),
 	DEV_CLK(104, 8, "board_0_mcu_ospi1_dqs_out"),
+	DEV_CLK(113, 0, "k3_pll_ctrl_wrap_wkup_0_chip_div1_clk_clk"),
 	DEV_CLK(133, 0, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
 	DEV_CLK(133, 1, "k3_pll_ctrl_wrap_main_0_chip_div1_clk_clk"),
 	DEV_CLK(138, 0, "k3_pll_ctrl_wrap_wkup_0_chip_div1_clk_clk"),
@@ -776,5 +777,6 @@ const struct ti_k3_clk_platdata j721e_clk_platdata = {
 	.clk_list = clk_list,
 	.clk_list_cnt = 156,
 	.soc_dev_clk_data = soc_dev_clk_data,
-	.soc_dev_clk_data_cnt = 170,
+	.soc_dev_clk_data_cnt = 171,
 };
+
