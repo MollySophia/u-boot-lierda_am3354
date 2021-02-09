@@ -13,6 +13,11 @@
 #include <dm/read.h>
 #include <dt-structs.h>
 #include <errno.h>
+#include <log.h>
+#include <malloc.h>
+#include <dm/device-internal.h>
+#include <dm/read.h>
+#include <linux/bug.h>
 #include <linux/clk-provider.h>
 
 static inline const struct clk_ops *clk_dev_ops(struct udevice *dev)
@@ -514,6 +519,7 @@ ulong clk_set_rate(struct clk *clk, ulong rate)
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
 	const struct clk_ops *ops;
+	int ret;
 
 	debug("%s(clk=%p, parent=%p)\n", __func__, clk, parent);
 	if (!clk)
@@ -523,7 +529,14 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 	if (!ops->set_parent)
 		return -ENOSYS;
 
-	return ops->set_parent(clk, parent);
+	ret = ops->set_parent(clk, parent);
+	if (ret)
+		return ret;
+
+	if (CONFIG_IS_ENABLED(CLK_CCF))
+		ret = device_reparent(clk->dev, parent->dev);
+
+	return ret;
 }
 
 int clk_enable(struct clk *clk)
