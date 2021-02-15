@@ -836,6 +836,9 @@ static int wiz_get_lane_phy_types(struct udevice *dev, struct wiz *wiz)
 		u32 reg, num_lanes = 1, phy_type = PHY_NONE;
 		int ret, i;
 
+		if (!ofnode_name_eq(child, "link"))
+			continue;
+
 		ret = ofnode_read_u32(child, "reg", &reg);
 		if (ret) {
 			dev_err(dev, "%s: Reading \"reg\" from failed: %d\n",
