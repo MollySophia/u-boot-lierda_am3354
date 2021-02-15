@@ -3,6 +3,9 @@
  * Copyright (C) 2021 Texas Instruments Incorporated - https://www.ti.com/
  */
 
+#include <dt-bindings/mux/mux-j721e-wiz.h>
+#include <dt-bindings/phy/phy.h>
+
 / {
 	chosen {
 		stdout-path = "serial2:115200n8";
@@ -125,4 +128,21 @@
 			u-boot,dm-spl;
 		};
 	};
+};
+
+&main_usb0_pins_default {
+	u-boot,dm-spl;
+};
+
+&serdes_ln_ctrl {
+	u-boot,mux-autoprobe;
+};
+
+&usbss0 {
+	u-boot,dm-spl;
+};
+
+&usb0 {
+	dr_mode = "host";
+	u-boot,dm-spl;
 };
