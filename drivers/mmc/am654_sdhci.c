@@ -150,75 +150,6 @@ struct am654_driver_data {
 	u32 flags;
 };
 
-static int am654_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
-{
-	struct mmc_cmd cmd;
-	struct mmc_data data;
-	u32 ctrl;
-	struct sdhci_host *host;
-	char tuning_loop_counter = SDHCI_TUNING_LOOP_COUNT;
-
-	debug("%s\n", __func__);
-
-	host = mmc->priv;
-
-	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-	ctrl |= SDHCI_CTRL_EXEC_TUNING;
-	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-
-	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_INT_ENABLE);
-	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_SIGNAL_ENABLE);
-
-	do {
-		cmd.cmdidx = opcode;
-		cmd.resp_type = MMC_RSP_R1;
-		cmd.cmdarg = 0;
-
-		data.blocksize = 64;
-		data.blocks = 1;
-		data.flags = MMC_DATA_READ;
-
-		if (tuning_loop_counter-- == 0)
-			break;
-
-		if (cmd.cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200 &&
-		    mmc->bus_width == 8)
-			data.blocksize = 128;
-
-		sdhci_writew(host, SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG,
-						    data.blocksize),
-			     SDHCI_BLOCK_SIZE);
-		sdhci_writew(host, data.blocks, SDHCI_BLOCK_COUNT);
-		sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
-
-		mmc_send_cmd(mmc, &cmd, NULL);
-
-		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-
-		if (cmd.cmdidx == MMC_CMD_SEND_TUNING_BLOCK)
-			udelay(1);
-
-	} while (ctrl & SDHCI_CTRL_EXEC_TUNING);
-
-	if (tuning_loop_counter < 0) {
-		ctrl &= ~SDHCI_CTRL_TUNED_CLK;
-		sdhci_writel(host, ctrl, SDHCI_HOST_CONTROL2);
-	}
-
-	if (!(ctrl & SDHCI_CTRL_TUNED_CLK)) {
-		printf("%s:Tuning failed\n", __func__);
-		return -1;
-	}
-
-	/* Enable only interrupts served by the SD controller */
-	sdhci_writel(host, SDHCI_INT_DATA_MASK | SDHCI_INT_CMD_MASK,
-		     SDHCI_INT_ENABLE);
-	/* Mask all sdhci interrupt sources */
-	sdhci_writel(host, 0x0, SDHCI_SIGNAL_ENABLE);
-
-	return 0;
-}
-
 static void am654_sdhci_set_control_reg(struct sdhci_host *host)
 {
 	struct mmc *mmc = (struct mmc *)host->mmc;
@@ -373,10 +304,51 @@ static int am654_sdhci_set_ios_post(struct sdhci_host *host)
 	return 0;
 }
 
+#ifdef MMC_SUPPORTS_TUNING
+#define ITAP_MAX	32
+static int am654_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
+{
+	struct udevice *dev = mmc->dev;
+	struct am654_sdhci_plat *plat = dev_get_platdata(dev);
+	int cur_val, prev_val = 1, fail_len = 0, pass_window = 0, pass_len;
+	u32 itap;
+
+	/* Enable ITAPDLY */
+	regmap_update_bits(plat->base, PHY_CTRL4, ITAPDLYENA_MASK,
+			   1 << ITAPDLYENA_SHIFT);
+
+	for (itap = 0; itap < ITAP_MAX; itap++) {
+		am654_sdhci_write_itapdly(plat, itap);
+
+		cur_val = !mmc_send_tuning(mmc, opcode, NULL);
+		if (cur_val && !prev_val)
+			pass_window = itap;
+
+		if (!cur_val)
+			fail_len++;
+
+		prev_val = cur_val;
+	}
+	/*
+	 * Having determined the length of the failing window and start of
+	 * the passing window calculate the length of the passing window and
+	 * set the final value halfway through it considering the range as a
+	 * circular buffer
+	 */
+	pass_len = ITAP_MAX - fail_len;
+	itap = (pass_window + (pass_len >> 1)) % ITAP_MAX;
+	am654_sdhci_write_itapdly(plat, itap);
+
+	return 0;
+}
+#endif
+
 const struct sdhci_ops am654_sdhci_ops = {
 	.set_ios_post		= &am654_sdhci_set_ios_post,
 	.set_control_reg	= &am654_sdhci_set_control_reg,
+#ifdef MMC_SUPPORTS_TUNING
 	.platform_execute_tuning = &am654_sdhci_execute_tuning,
+#endif
 };
 
 const struct am654_driver_data am654_drv_data = {
@@ -414,7 +386,9 @@ static int j721e_4bit_sdhci_set_ios_post(struct sdhci_host *host)
 const struct sdhci_ops j721e_4bit_sdhci_ops = {
 	.set_ios_post		= &j721e_4bit_sdhci_set_ios_post,
 	.set_control_reg	= &sdhci_set_control_reg,
+#ifdef MMC_SUPPORTS_TUNING
 	.platform_execute_tuning = &am654_sdhci_execute_tuning,
+#endif
 };
 
 const struct am654_driver_data j721e_4bit_drv_data = {
