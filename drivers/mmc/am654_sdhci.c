@@ -64,6 +64,14 @@
 #define RETRIM_MASK		BIT(RETRIM_SHIFT)
 #define SELDLYTXCLK_SHIFT	17
 #define SELDLYTXCLK_MASK	BIT(SELDLYTXCLK_SHIFT)
+#define SELDLYRXCLK_SHIFT	16
+#define SELDLYRXCLK_MASK	BIT(SELDLYRXCLK_SHIFT)
+#define ITAPDLYSEL_SHIFT	0
+#define ITAPDLYSEL_MASK	GENMASK(4, 0)
+#define ITAPDLYENA_SHIFT	8
+#define ITAPDLYENA_MASK	BIT(ITAPDLYENA_SHIFT)
+#define ITAPCHGWIN_SHIFT	9
+#define ITAPCHGWIN_MASK	BIT(ITAPCHGWIN_SHIFT)
 
 #define DRIVER_STRENGTH_50_OHM	0x0
 #define DRIVER_STRENGTH_33_OHM	0x1
@@ -72,6 +80,7 @@
 #define DRIVER_STRENGTH_40_OHM	0x4
 
 #define AM654_SDHCI_MIN_FREQ	400000
+#define CLOCK_TOO_SLOW_HZ	50000000
 
 #define SDHCI_TUNING_LOOP_COUNT	40
 
@@ -81,6 +90,7 @@ struct am654_sdhci_plat {
 	struct regmap *base;
 	bool non_removable;
 	u32 otap_del_sel[MMC_MODES_END];
+	u32 itap_del_sel[MMC_MODES_END];
 	u32 trm_icp;
 	u32 drv_strength;
 	u32 strb_sel;
@@ -94,22 +104,45 @@ struct am654_sdhci_plat {
 };
 
 struct timing_data {
-	const char *binding;
+	const char *otap_binding;
+	const char *itap_binding;
 	u32 capability;
 };
 
 static const struct timing_data td[] = {
-	[MMC_LEGACY] = {"ti,otap-del-sel-legacy", 0},
-	[MMC_HS] = {"ti,otap-del-sel-mmc-hs", MMC_CAP(MMC_HS)},
-	[SD_HS]  = {"ti,otap-del-sel-sd-hs", MMC_CAP(SD_HS)},
-	[UHS_SDR12] = {"ti,otap-del-sel-sdr12", MMC_CAP(UHS_SDR12)},
-	[UHS_SDR25] = {"ti,otap-del-sel-sdr25", MMC_CAP(UHS_SDR25)},
-	[UHS_SDR50] = {"ti,otap-del-sel-sdr50", MMC_CAP(UHS_SDR50)},
-	[UHS_SDR104] = {"ti,otap-del-sel-sdr104", MMC_CAP(UHS_SDR104)},
-	[UHS_DDR50] = {"ti,otap-del-sel-ddr50", MMC_CAP(UHS_DDR50)},
-	[MMC_DDR_52] = {"ti,otap-del-sel-ddr52", MMC_CAP(MMC_DDR_52)},
-	[MMC_HS_200] = {"ti,otap-del-sel-hs200", MMC_CAP(MMC_HS_200)},
-	[MMC_HS_400] = {"ti,otap-del-sel-hs400", MMC_CAP(MMC_HS_400)},
+	[MMC_LEGACY]	= {"ti,otap-del-sel-legacy",
+			   "ti,itap-del-sel-legacy",
+			   0},
+	[MMC_HS]	= {"ti,otap-del-sel-mmc-hs",
+			   "ti,itap-del-sel-mms-hs",
+			   MMC_CAP(MMC_HS)},
+	[SD_HS]		= {"ti,otap-del-sel-sd-hs",
+			   "ti,itap-del-sel-sd-hs",
+			   MMC_CAP(SD_HS)},
+	[UHS_SDR12]	= {"ti,otap-del-sel-sdr12",
+			   "ti,itap-del-sel-sdr12",
+			   MMC_CAP(UHS_SDR12)},
+	[UHS_SDR25]	= {"ti,otap-del-sel-sdr25",
+			   "ti,itap-del-sel-sdr25",
+			   MMC_CAP(UHS_SDR25)},
+	[UHS_SDR50]	= {"ti,otap-del-sel-sdr50",
+			   NULL,
+			   MMC_CAP(UHS_SDR50)},
+	[UHS_SDR104]	= {"ti,otap-del-sel-sdr104",
+			   NULL,
+			   MMC_CAP(UHS_SDR104)},
+	[UHS_DDR50]	= {"ti,otap-del-sel-ddr50",
+			   NULL,
+			   MMC_CAP(UHS_DDR50)},
+	[MMC_DDR_52]	= {"ti,otap-del-sel-ddr52",
+			   "ti,itap-del-sel-ddr52",
+			   MMC_CAP(MMC_DDR_52)},
+	[MMC_HS_200]	= {"ti,otap-del-sel-hs200",
+			   NULL,
+			   MMC_CAP(MMC_HS_200)},
+	[MMC_HS_400]	= {"ti,otap-del-sel-hs400",
+			   NULL,
+			   MMC_CAP(MMC_HS_400)},
 };
 
 struct am654_driver_data {
@@ -201,13 +234,17 @@ static void am654_sdhci_set_control_reg(struct sdhci_host *host)
 	sdhci_set_uhs_timing(host);
 }
 
-static void sdhci_am654_setup_dll(struct sdhci_host *host, unsigned int speed)
+static int sdhci_am654_setup_dll(struct sdhci_host *host, unsigned int speed)
 {
 	struct udevice *dev = host->mmc->dev;
 	struct am654_sdhci_plat *plat = dev_get_platdata(dev);
 	int sel50, sel100, freqsel;
 	u32 mask, val;
 	int ret;
+
+	/* Disable delay chain mode */
+	regmap_update_bits(plat->base, PHY_CTRL5,
+			   SELDLYTXCLK_MASK | SELDLYRXCLK_MASK, 0);
 
 	if (plat->flags & FREQSEL_2_BIT) {
 		switch (speed) {
@@ -260,8 +297,32 @@ static void sdhci_am654_setup_dll(struct sdhci_host *host, unsigned int speed)
 				       val & DLLRDY_MASK, 1000, 1000000);
 	if (ret) {
 		dev_err(dev, "DLL failed to relock\n");
-		return;
+		return ret;
 	}
+	return 0;
+}
+
+static void am654_sdhci_write_itapdly(struct am654_sdhci_plat *plat,
+				      u32 itapdly)
+{
+	/* Set ITAPCHGWIN before writing to ITAPDLY */
+	regmap_update_bits(plat->base, PHY_CTRL4, ITAPCHGWIN_MASK,
+			   1 << ITAPCHGWIN_SHIFT);
+	regmap_update_bits(plat->base, PHY_CTRL4, ITAPDLYSEL_MASK,
+			   itapdly << ITAPDLYSEL_SHIFT);
+	regmap_update_bits(plat->base, PHY_CTRL4, ITAPCHGWIN_MASK, 0);
+}
+
+static void am654_sdhci_setup_delay_chain(struct am654_sdhci_plat *plat,
+					  int mode)
+{
+	u32 mask, val;
+
+	val = 1 << SELDLYTXCLK_SHIFT | 1 << SELDLYRXCLK_SHIFT;
+	mask = SELDLYTXCLK_MASK | SELDLYRXCLK_MASK;
+	regmap_update_bits(plat->base, PHY_CTRL5, mask, val);
+
+	am654_sdhci_write_itapdly(plat, plat->itap_del_sel[mode]);
 }
 
 static int am654_sdhci_set_ios_post(struct sdhci_host *host)
@@ -272,6 +333,7 @@ static int am654_sdhci_set_ios_post(struct sdhci_host *host)
 	int mode = host->mmc->selected_mode;
 	u32 otap_del_sel;
 	u32 mask, val;
+	int ret;
 
 	/* Reset SD Clock Enable */
 	val = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
@@ -300,16 +362,13 @@ static int am654_sdhci_set_ios_post(struct sdhci_host *host)
 
 	regmap_update_bits(plat->base, PHY_CTRL4, mask, val);
 
-	if (speed > AM654_SDHCI_MIN_FREQ && mode > UHS_SDR25) {
-		regmap_update_bits(plat->base, PHY_CTRL5, SELDLYTXCLK_MASK, 0);
-		sdhci_am654_setup_dll(host, speed);
+	if (speed >= CLOCK_TOO_SLOW_HZ && mode > UHS_SDR25) {
+		ret = sdhci_am654_setup_dll(host, speed);
+		if (ret)
+			return ret;
 	} else {
-		regmap_update_bits(plat->base, PHY_CTRL5, SELDLYTXCLK_MASK,
-				   1 << SELDLYTXCLK_SHIFT);
+		am654_sdhci_setup_delay_chain(plat, mode);
 	}
-
-	regmap_update_bits(plat->base, PHY_CTRL5, CLKBUFSEL_MASK,
-			   plat->clkbuf_sel);
 
 	return 0;
 }
@@ -432,15 +491,20 @@ static int sdhci_am654_get_otap_delay(struct udevice *dev,
 	 * value is not found
 	 */
 	for (i = MMC_HS; i <= MMC_HS_400; i++) {
-		ret = dev_read_u32(dev, td[i].binding, &plat->otap_del_sel[i]);
+		ret = dev_read_u32(dev, td[i].otap_binding,
+				   &plat->otap_del_sel[i]);
 		if (ret) {
-			dev_dbg(dev, "Couldn't find %s\n", td[i].binding);
+			dev_dbg(dev, "Couldn't find %s\n", td[i].otap_binding);
 			/*
 			 * Remove the corresponding capability
 			 * if an otap-del-sel value is not found
 			 */
 			cfg->host_caps &= ~td[i].capability;
 		}
+
+		if (td[i].itap_binding)
+			dev_read_u32(dev, td[i].itap_binding,
+				     &plat->itap_del_sel[i]);
 	}
 
 	return 0;
