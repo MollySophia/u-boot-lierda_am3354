@@ -89,9 +89,11 @@
 };
 
 &dmsc {
-	mboxes= <&mcu_secproxy 8>, <&mcu_secproxy 6>, <&mcu_secproxy 5>;
-	mbox-names = "tx", "rx", "notify";
+	mboxes= <&mcu_secproxy 8>, <&mcu_secproxy 6>, <&mcu_secproxy 5>,
+		<&mcu_secproxy 23>, <&mcu_secproxy 21>;
+	mbox-names = "tx", "rx", "notify", "dm-tx", "dm-rx";
 	ti,host-id = <4>;
+	ti,dm-host-id = <250>;
 	ti,secure-host;
 };
 
