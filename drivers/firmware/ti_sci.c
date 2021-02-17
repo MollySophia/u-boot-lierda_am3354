@@ -81,14 +81,18 @@ struct ti_sci_info {
 	const struct ti_sci_desc *desc;
 	struct ti_sci_handle handle;
 	struct mbox_chan chan_tx;
+	struct mbox_chan dm_chan_tx;
 	struct mbox_chan chan_rx;
+	struct mbox_chan dm_chan_rx;
 	struct mbox_chan chan_notify;
 	struct ti_sci_xfer xfer;
 	struct list_head list;
 	struct list_head dev_list;
 	bool is_secure;
 	u8 host_id;
+	u8 dm_host_id;
 	u8 seq;
+	u8 dm_seq;
 };
 
 struct ti_sci_exclusive_dev {
@@ -98,6 +102,16 @@ struct ti_sci_exclusive_dev {
 };
 
 #define handle_to_ti_sci_info(h) container_of(h, struct ti_sci_info, handle)
+
+/* In R5 SPL, RM msgs are to be forwarded using DM2DMSC queue */
+static inline bool ti_sci_use_dm_queue(struct ti_sci_info *info, u16 msgtype)
+{
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM)) {
+		return msgtype >= TI_SCI_MSG_RM_RING_CFG &&
+			msgtype <= TISCI_MSG_RM_UDMAP_FLOW_SIZE_THRESH_CFG;
+	}
+	return false;
+}
 
 /**
  * ti_sci_setup_one_xfer() - Setup one message type
@@ -121,6 +135,7 @@ static struct ti_sci_xfer *ti_sci_setup_one_xfer(struct ti_sci_info *info,
 						 size_t tx_message_size,
 						 size_t rx_message_size)
 {
+	bool use_dm_queue = ti_sci_use_dm_queue(info, msg_type);
 	struct ti_sci_xfer *xfer = &info->xfer;
 	struct ti_sci_msg_hdr *hdr;
 
@@ -131,15 +146,22 @@ static struct ti_sci_xfer *ti_sci_setup_one_xfer(struct ti_sci_info *info,
 	    tx_message_size < sizeof(*hdr))
 		return ERR_PTR(-ERANGE);
 
-	info->seq = ~info->seq;
+	if (use_dm_queue)
+		info->dm_seq = ~info->dm_seq;
+	else
+		info->seq = ~info->seq;
+
 	xfer->tx_message.buf = buf;
 	xfer->tx_message.len = tx_message_size;
 	xfer->rx_len = (u8)rx_message_size;
 
 	hdr = (struct ti_sci_msg_hdr *)buf;
-	hdr->seq = info->seq;
 	hdr->type = msg_type;
 	hdr->host = info->host_id;
+	if (use_dm_queue)
+		hdr->seq = info->dm_seq;
+	else
+		hdr->seq = info->seq;
 	hdr->flags = msg_flags;
 
 	return xfer;
@@ -159,10 +181,12 @@ static inline int ti_sci_get_response(struct ti_sci_info *info,
 				      struct ti_sci_xfer *xfer,
 				      struct mbox_chan *chan)
 {
+	bool use_dm_queue = (chan == &info->dm_chan_rx) && info->dm_host_id;
 	struct k3_sec_proxy_msg *msg = &xfer->tx_message;
 	struct ti_sci_secure_msg_hdr *secure_hdr;
 	struct ti_sci_msg_hdr *hdr;
 	int ret;
+	u8 seq;
 
 	/* Receive the response */
 	ret = mbox_recv(chan, msg, info->desc->max_rx_timeout_ms * 1000);
@@ -182,7 +206,8 @@ static inline int ti_sci_get_response(struct ti_sci_info *info,
 	hdr = (struct ti_sci_msg_hdr *)msg->buf;
 
 	/* Sanity check for message response */
-	if (hdr->seq != info->seq) {
+	seq = use_dm_queue ? info->dm_seq : info->seq;
+	if (hdr->seq != seq) {
 		dev_dbg(info->dev, "%s: Message for %d is not expected\n",
 			__func__, hdr->seq);
 		return ret;
@@ -215,7 +240,20 @@ static inline int ti_sci_do_xfer(struct ti_sci_info *info,
 	struct k3_sec_proxy_msg *msg = &xfer->tx_message;
 	u8 secure_buf[info->desc->max_msg_size];
 	struct ti_sci_secure_msg_hdr secure_hdr;
+	struct mbox_chan *chan_tx, *chan_rx;
+	struct ti_sci_msg_hdr *hdr;
+	bool use_dm_queue;
 	int ret;
+
+	hdr = (struct ti_sci_msg_hdr *)xfer->tx_message.buf;
+	use_dm_queue = ti_sci_use_dm_queue(info, hdr->type);
+	if (use_dm_queue) {
+		chan_tx = &info->dm_chan_tx;
+		chan_rx = &info->dm_chan_rx;
+	} else {
+		chan_tx = &info->chan_tx;
+		chan_rx = &info->chan_rx;
+	}
 
 	if (info->is_secure) {
 		/* ToDo: get checksum of the entire message */
@@ -232,7 +270,7 @@ static inline int ti_sci_do_xfer(struct ti_sci_info *info,
 	}
 
 	/* Send the message */
-	ret = mbox_send(&info->chan_tx, msg);
+	ret = mbox_send(chan_tx, msg);
 	if (ret) {
 		dev_err(info->dev, "%s: Message sending failed. ret = %d\n",
 			__func__, ret);
@@ -241,7 +279,7 @@ static inline int ti_sci_do_xfer(struct ti_sci_info *info,
 
 	/* Get response if requested */
 	if (xfer->rx_len)
-		ret = ti_sci_get_response(info, xfer, &info->chan_rx);
+		ret = ti_sci_get_response(info, xfer, chan_rx);
 
 	return ret;
 }
@@ -2959,6 +2997,25 @@ static int ti_sci_of_to_info(struct udevice *dev, struct ti_sci_info *info)
 			__func__, ret);
 	}
 
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM)) {
+		ret = mbox_get_by_name(dev, "dm-tx", &info->dm_chan_tx);
+		if (ret) {
+			dev_err(dev, "%s: Acquiring DM Tx channel failed. ret = %d\n",
+				__func__, ret);
+			return ret;
+		}
+
+		ret = mbox_get_by_name(dev, "dm-rx", &info->dm_chan_rx);
+		if (ret) {
+			dev_err(dev, "%s: Acquiring DM Rx channel failed. ret = %d\n",
+				__func__, ret);
+			return ret;
+		}
+
+		info->dm_host_id = dev_read_u32_default(dev, "ti,dm-host-id",
+							info->desc->default_host_id);
+	}
+
 	info->host_id = dev_read_u32_default(dev, "ti,host-id",
 					     info->desc->default_host_id);
 
@@ -2991,6 +3048,7 @@ static int ti_sci_probe(struct udevice *dev)
 
 	info->dev = dev;
 	info->seq = 0xA;
+	info->dm_seq = 0xA;
 
 	list_add_tail(&info->list, &ti_sci_list);
 	ti_sci_setup_ops(info);

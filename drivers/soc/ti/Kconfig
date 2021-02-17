@@ -16,6 +16,14 @@ config TI_K3_NAVSS_RINGACC
 	  and a consumer. There is one RINGACC module per NAVSS on TI AM65x SoCs
 	  If unsure, say N.
 
+config SPL_TI_K3_RAW_RM
+	bool "TI SCI RM services are unavailable at SPL"
+	help
+	  Say y here to support raw accessors for K3 Ring accelerator and
+	  NAVSS DMA configuration APIs when TISCI Device Manager server is absent.
+	  This is usually used in SPL stages when TISCI DM server is not yet
+	  available.
+
 config TI_KEYSTONE_SERDES
 	bool "Keystone SerDes driver for ethernet"
 	depends on ARCH_KEYSTONE
