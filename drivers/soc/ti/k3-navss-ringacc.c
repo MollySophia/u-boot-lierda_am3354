@@ -118,6 +118,7 @@ struct k3_nav_ring_state {
 /**
  * struct k3_nav_ring - RA Ring descriptor
  *
+ * @cfg - Ring configuration registers
  * @rt - Ring control/status registers
  * @fifos - Ring queues registers
  * @ring_mem_dma - Ring buffer dma address
@@ -132,6 +133,7 @@ struct k3_nav_ring_state {
  * @use_count - Use count for shared rings
  */
 struct k3_nav_ring {
+	struct k3_nav_ring_cfg_regs __iomem *cfg;
 	struct k3_nav_ring_rt_regs __iomem *rt;
 	struct k3_nav_ring_fifo_regs __iomem *fifos;
 	dma_addr_t	ring_mem_dma;
@@ -188,6 +190,8 @@ struct k3_nav_ringacc {
 	const struct k3_nav_ringacc_ops *ops;
 	bool dual_ring;
 };
+
+#include "k3-navss-ringacc-u-boot.c"
 
 static int k3_nav_ringacc_ring_read_occ(struct k3_nav_ring *ring)
 {
@@ -324,6 +328,9 @@ static void k3_ringacc_ring_reset_sci(struct k3_nav_ring *ring)
 	struct k3_nav_ringacc *ringacc = ring->parent;
 	int ret;
 
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM))
+		return k3_ringacc_ring_reset_raw(ring);
+
 	ret = ringacc->tisci_ring_ops->config(
 			ringacc->tisci,
 			TI_SCI_MSG_VALUE_RM_RING_COUNT_VALID,
@@ -355,6 +362,9 @@ static void k3_ringacc_ring_reconfig_qmode_sci(struct k3_nav_ring *ring,
 {
 	struct k3_nav_ringacc *ringacc = ring->parent;
 	int ret;
+
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM))
+		return k3_ringacc_ring_reconfig_qmode_raw(ring, mode);
 
 	ret = ringacc->tisci_ring_ops->config(
 			ringacc->tisci,
@@ -435,6 +445,9 @@ static void k3_ringacc_ring_free_sci(struct k3_nav_ring *ring)
 {
 	struct k3_nav_ringacc *ringacc = ring->parent;
 	int ret;
+
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM))
+		return k3_ringacc_ring_free_raw(ring);
 
 	ret = ringacc->tisci_ring_ops->config(
 			ringacc->tisci,
@@ -525,11 +538,21 @@ static int k3_nav_ringacc_ring_cfg_sci(struct k3_nav_ring *ring)
 			ring->mode,
 			ring->elm_size,
 			0);
-	if (ret)
+	if (ret) {
 		dev_err(ringacc->dev, "TISCI config ring fail (%d) ring_idx %d\n",
 			ret, ring_idx);
+		return ret;
+	}
 
-	return ret;
+	/*
+	 * Above TI SCI call handles firewall configuration, cfg
+	 * register configuration still has to be done locally in
+	 * absence of RM services.
+	 */
+	if (CONFIG_IS_ENABLED(TI_K3_RAW_RM))
+		k3_nav_ringacc_ring_cfg_raw(ring);
+
+	return 0;
 }
 
 static int k3_dmaring_ring_cfg(struct k3_nav_ring *ring, struct k3_nav_ring_cfg *cfg)
@@ -945,12 +968,17 @@ static int k3_nav_ringacc_probe_dt(struct k3_nav_ringacc *ringacc)
 
 static int k3_nav_ringacc_init(struct udevice *dev, struct k3_nav_ringacc *ringacc)
 {
-	void __iomem *base_rt;
+	void __iomem *base_cfg, *base_rt;
 	int ret, i;
 
 	ret = k3_nav_ringacc_probe_dt(ringacc);
 	if (ret)
 		return ret;
+
+	base_cfg = dev_remap_addr_name(dev, "cfg");
+	pr_debug("cfg %p\n", base_cfg);
+	if (!base_cfg)
+		return -EINVAL;
 
 	base_rt = (uint32_t *)devfdt_get_addr_name(dev, "rt");
 	pr_debug("rt %p\n", base_rt);
@@ -969,6 +997,8 @@ static int k3_nav_ringacc_init(struct udevice *dev, struct k3_nav_ringacc *ringa
 		return -ENOMEM;
 
 	for (i = 0; i < ringacc->num_rings; i++) {
+		ringacc->rings[i].cfg = base_cfg +
+					KNAV_RINGACC_CFG_REGS_STEP * i;
 		ringacc->rings[i].rt = base_rt +
 				       KNAV_RINGACC_RT_REGS_STEP * i;
 		ringacc->rings[i].parent = ringacc;
