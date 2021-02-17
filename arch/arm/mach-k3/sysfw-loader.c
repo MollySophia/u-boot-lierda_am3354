@@ -258,14 +258,14 @@ static void k3_sysfw_configure_using_fit(void *fit,
 		panic("Error accessing %s node in FIT (%d)\n", SYSFW_CFG_RM,
 		      ret);
 
-#ifdef CONFIG_CLK_TI_SCI
 	/* Apply resource management (RM) configuration to SYSFW */
 	ret = board_ops->board_config_rm(ti_sci,
 					 (u64)(u32)cfg_fragment_addr,
 					 (u32)cfg_fragment_size);
 	if (ret)
 		panic("Failed to set board RM configuration (%d)\n", ret);
-#else
+
+#ifndef CONFIG_CLK_TI_SCI
 	if (copy_bcfg) {
 		desc = &bcfg_header->descs[1];
 
