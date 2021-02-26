@@ -115,6 +115,7 @@ static ulong ti_pll_clk_get_rate(struct clk *clk)
 static ulong ti_pll_clk_set_rate(struct clk *clk, ulong rate)
 {
 	struct ti_pll_clk *pll = to_clk_pll(clk);
+	u64 current_freq;
 	u64 parent_freq = clk_get_parent_rate(clk);
 	int ret;
 	u32 ctrl;
@@ -187,9 +188,18 @@ static ulong ti_pll_clk_set_rate(struct clk *clk, ulong rate)
 	debug("%s: pllm=%u, plld=%u, pllfm=%u, parent_freq=%u\n",
 	      __func__, (u32)pllm, (u32)plld, (u32)pllfm, (u32)parent_freq);
 
-	return parent_freq * pllm / plld +
-		((parent_freq * pllfm / plld) >>
-		 PLL_16FFT_FREQ_CTRL1_FB_DIV_FRAC_BITS);
+	current_freq = parent_freq * pllm / plld;
+
+	if (pllfm) {
+		u64 tmp;
+
+		tmp = parent_freq * pllfm;
+		do_div(tmp, plld);
+		tmp >>= PLL_16FFT_FREQ_CTRL1_FB_DIV_FRAC_BITS;
+		current_freq += tmp;
+	}
+
+	return current_freq;
 }
 
 static int ti_pll_clk_enable(struct clk *clk)
