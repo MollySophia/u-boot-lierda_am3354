@@ -221,7 +221,7 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 	int div = 1;
 	ulong child_rate;
 	const struct clk_ops *ops;
-	ulong new_rate;
+	ulong new_rate, rem;
 	ulong diff, new_diff;
 
 	/*
@@ -253,24 +253,10 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 
 	new_rate = clk_set_rate(clkp, rate / div);
 
-	/*
-	 * If the new rate differs by at least 5% of the target,
-	 * we must check for rounding error in a divider, so try
-	 * set rate with rate + 1.
-	 */
-
 	diff = abs(new_rate - rate / div);
 
 	debug("%s: clk=%s, div=%d, rate=%u, new_rate=%u, diff=%u\n", __func__,
 	      clkp->dev->name, div, (u32)rate, (u32)new_rate, (u32)diff);
-
-	if (diff > rate / div / 20) {
-		new_rate = clk_set_rate(clkp, (rate / div) + 1);
-		new_diff = abs(new_rate - rate / div);
-
-		if (new_diff > diff)
-			new_rate = clk_set_rate(clkp, rate / div);
-	}
 
 	/*
 	 * If the new rate differs by 50% of the target,
@@ -303,6 +289,26 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 		clk_set_rate(clkp, pll_tgt);
 
 		return clk_set_rate(clk, rate / div) * div;
+	}
+
+	/*
+	 * If the new rate differs by at least 5% of the target,
+	 * we must check for rounding error in a divider, so try
+	 * set rate with rate + (parent_freq % rate).
+	 */
+
+	if (diff > rate / div / 20) {
+		u64 parent_freq = clk_get_parent_rate(clkp);
+		rem = parent_freq % rate;
+		new_rate = clk_set_rate(clkp, (rate / div) + rem);
+		new_diff = abs(new_rate - rate / div);
+
+		if (new_diff > diff) {
+			new_rate = clk_set_rate(clkp, rate / div);
+		} else {
+			debug("%s: Using better rate %u that gives diff %d\n",
+			       __func__, new_rate, new_diff);
+		}
 	}
 
 	return new_rate;
