@@ -15,6 +15,7 @@
 
 #define PLL_MIN_FREQ	800000000
 #define PLL_MAX_FREQ	3200000000UL
+#define PLL_MAX_DIV	127
 
 /**
  * struct clk_map - mapping from dev/clk id tuples towards physical clocks
@@ -266,7 +267,7 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 
 	if (diff > rate / div / 2) {
 		ulong pll_tgt;
-		int pll_div;
+		int pll_div = 0;
 
 		clk = clkp;
 
@@ -276,8 +277,16 @@ static ulong ti_clk_set_rate(struct clk *clk, ulong rate)
 		clkp = clk_get_parent(clkp);
 
 		if (rate > osc_freq) {
-			pll_div = PLL_MAX_FREQ / rate / div;
-			pll_tgt = rate / div * pll_div;
+			if ((rate * 2) > PLL_MAX_FREQ && rate < PLL_MAX_FREQ) {
+				pll_tgt = rate;
+				pll_div = 1;
+			} else {
+				for (pll_div = 2; pll_div < PLL_MAX_DIV; pll_div++) {
+					pll_tgt = rate / div * pll_div;
+					if (pll_tgt >= PLL_MIN_FREQ && pll_tgt <= PLL_MAX_FREQ)
+						break;
+				}
+			}
 		} else {
 			pll_tgt = osc_freq;
 			pll_div = rate / div / osc_freq;
