@@ -277,6 +277,18 @@ void board_init_f(ulong dummy)
 	/* Init DM early */
 	spl_early_init();
 
+#ifdef CONFIG_SPL_CLK_K3
+	/*
+	 * Force probe of clk_k3 driver here to ensure basic default clock
+	 * configuration is always done.
+	 */
+	ret = uclass_get_device_by_driver(UCLASS_CLK,
+					  DM_GET_DRIVER(ti_clk),
+					  &dev);
+	if (ret)
+		panic("Failed to initialize clk-k3!\n");
+#endif
+
 #ifdef CONFIG_K3_LOAD_SYSFW
 	/*
 	 * Process pinctrl for the serial0 a.k.a. MCU_UART0 module and continue
