@@ -191,9 +191,15 @@ static int am64_ddrss_power_on(struct am64_ddrss_desc *ddrss)
 	device_get_supply_regulator(ddrss->dev, "vtt-supply",
 				    &ddrss->vtt_supply);
 	ret = regulator_set_value(ddrss->vtt_supply, 3300000);
-	if (ret)
-		return ret;
-	debug("VTT regulator enabled, volt = %d\n", regulator_get_value(ddrss->vtt_supply));
+	 if (ret) {
+                dev_dbg(ddrss->dev, "vtt-supply not found.\n");
+        } else {
+                ret = regulator_set_value(ddrss->vtt_supply, 3300000);
+                if (ret)
+                        return ret;
+                dev_dbg(ddrss->dev, "VTT regulator enabled, volt = %d\n",
+                        regulator_get_value(ddrss->vtt_supply));
+	}
 #endif
 
 	return 0;
